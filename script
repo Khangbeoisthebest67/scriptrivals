@@ -1,0 +1,1765 @@
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+
+pcall(function()
+    CoreGui:FindFirstChild("KHANG_SPLASH"):Destroy()
+end)
+
+-- BLUR
+local blur = Instance.new("BlurEffect", Lighting)
+blur.Size = 0
+TweenService:Create(blur, TweenInfo.new(0.5), {Size = 18}):Play()
+
+-- GUI
+local gui = Instance.new("ScreenGui", CoreGui)
+gui.Name = "KHANG_SPLASH"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+
+local bg = Instance.new("Frame", gui)
+bg.Size = UDim2.new(1,0,1,0)
+bg.BackgroundColor3 = Color3.fromRGB(5,6,10)
+
+-- LIGHTNING LAYER (FONDO)
+local lightningLayer = Instance.new("Frame", bg)
+lightningLayer.Size = UDim2.new(1,0,1,0)
+lightningLayer.BackgroundTransparency = 1
+lightningLayer.ZIndex = 1
+
+-- Rayos: zigzag sólido que caen hasta abajo
+local function spawnLightning()
+    local segments = math.random(8,11)
+    local x = math.random(15,85)/100
+    local y = -0.25
+    local lastX = x
+
+    for _ = 1, segments do
+        local segHeight = math.random(60,90)
+        local seg = Instance.new("Frame", lightningLayer)
+        seg.AnchorPoint = Vector2.new(0.5,0)
+        seg.Position = UDim2.new(lastX,0,y,0)
+        seg.Size = UDim2.new(0,4,0,segHeight)
+        seg.Rotation = math.random(-20,20)
+        seg.BackgroundColor3 = Color3.fromRGB(120,240,255)
+        seg.BorderSizePixel = 0
+        seg.ZIndex = 1
+
+        local glow = Instance.new("UIStroke", seg)
+        glow.Thickness = 3
+        glow.Color = Color3.fromRGB(120,255,255)
+        glow.Transparency = 0
+
+        local offset = math.random(-25,25)/1000
+        lastX += offset
+        y += segHeight / math.max(1, (game:GetService("Workspace").CurrentCamera and game:GetService("Workspace").CurrentCamera.ViewportSize.Y) or 720)
+
+        TweenService:Create(seg, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
+        task.delay(0.3, function() if seg and seg.Parent then seg:Destroy() end end)
+    end
+end
+
+-- TITULOS
+local title = Instance.new("TextLabel", bg)
+title.Size = UDim2.new(0,400,0,70)
+title.Position = UDim2.new(0.5,-200,0.42,-60)
+title.BackgroundTransparency = 1
+title.Text = "KHANG"
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 54
+title.TextColor3 = Color3.fromRGB(200,255,255)
+title.ZIndex = 2
+
+local sub = Instance.new("TextLabel", bg)
+sub.Size = UDim2.new(0,400,0,30)
+sub.Position = UDim2.new(0.5,-200,0.42,5)
+sub.BackgroundTransparency = 1
+sub.Text = "hub"
+sub.Font = Enum.Font.Gotham
+sub.TextSize = 18
+sub.TextColor3 = Color3.fromRGB(160,220,220)
+sub.ZIndex = 2
+
+-- FLOAT ANIMATION PARA TEXTOS
+task.spawn(function()
+    while title.Parent do
+        TweenService:Create(title, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = title.Position + UDim2.new(0,0,0,-8)}):Play()
+        TweenService:Create(sub, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = sub.Position + UDim2.new(0,0,0,-8)}):Play()
+        task.wait(2)
+        TweenService:Create(title, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = title.Position + UDim2.new(0,0,0,8)}):Play()
+        TweenService:Create(sub, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = sub.Position + UDim2.new(0,0,0,8)}):Play()
+        task.wait(2)
+    end
+end)
+
+-- LOADING BAR (ABAJO)
+local barBG = Instance.new("Frame", bg)
+barBG.Size = UDim2.new(0,460,0,12)
+barBG.Position = UDim2.new(0.5,-230,0.72,0)
+barBG.BackgroundColor3 = Color3.fromRGB(30,40,50)
+barBG.BorderSizePixel = 0
+barBG.ZIndex = 2
+barBG.ClipsDescendants = true
+Instance.new("UICorner", barBG)
+
+local barFill = Instance.new("Frame", barBG)
+barFill.Size = UDim2.new(0,0,1,0)
+barFill.BackgroundColor3 = Color3.fromRGB(55,95,140)
+barFill.BorderSizePixel = 0
+Instance.new("UICorner", barFill)
+
+local shimmer = Instance.new("Frame", barBG)
+shimmer.Size = UDim2.new(0.25,0,1,0)
+shimmer.Position = UDim2.new(-0.25,0,0,0)
+shimmer.BackgroundColor3 = Color3.fromRGB(150,255,255)
+shimmer.BorderSizePixel = 0
+Instance.new("UICorner", shimmer)
+shimmer.ZIndex = 3
+
+local percent = Instance.new("TextLabel", bg)
+percent.Size = UDim2.new(0,200,0,20)
+percent.Position = UDim2.new(0.5,-100,0.76,0)
+percent.BackgroundTransparency = 1
+percent.Text = "0%"
+percent.Font = Enum.Font.Gotham
+percent.TextSize = 14
+percent.TextColor3 = Color3.fromRGB(150,150,200)
+percent.ZIndex = 2
+
+local skip = Instance.new("TextButton", bg)
+skip.Size = UDim2.new(0,90,0,32)
+skip.Position = UDim2.new(1,-110,1,-50)
+skip.Text = "SKIP"
+skip.Font = Enum.Font.GothamBold
+skip.TextSize = 14
+skip.TextColor3 = Color3.new(1,1,1)
+skip.BackgroundColor3 = Color3.fromRGB(60,60,60)
+skip.BorderSizePixel = 0
+skip.ZIndex = 4
+Instance.new("UICorner", skip)
+
+local closed = false
+local function closeSplash()
+    if closed then return end
+    closed = true
+    TweenService:Create(blur, TweenInfo.new(0.35), {Size = 0}):Play()
+    for _, v in pairs(bg:GetDescendants()) do
+        if v:IsA("TextLabel") or v:IsA("TextButton") then
+            pcall(function() TweenService:Create(v, TweenInfo.new(0.25), {TextTransparency = 1}):Play() end)
+        elseif v:IsA("Frame") then
+            pcall(function() TweenService:Create(v, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play() end)
+        end
+    end
+    task.wait(0.36)
+    if blur and blur.Parent then blur:Destroy() end
+    if gui and gui.Parent then gui:Destroy() end
+end
+
+skip.MouseButton1Click:Connect(closeSplash)
+
+-- ANIMACION DEL SHIMMER
+local shimmerTweenTime = 1.1
+local shimmerTweenInfo = TweenInfo.new(shimmerTweenTime, Enum.EasingStyle.Linear)
+
+task.spawn(function()
+    while shimmer.Parent and not closed do
+        shimmer.Position = UDim2.new(-shimmer.Size.X.Scale, 0, 0, 0)
+        local targetPos = UDim2.new(1, 0, 0, 0)
+        local tw = TweenService:Create(shimmer, shimmerTweenInfo, {Position = targetPos})
+        tw:Play()
+        pcall(function() tw.Completed:Wait() end)
+        task.wait(0.05)
+    end
+end)
+
+-- RAYOS LOOP
+task.spawn(function()
+    while gui.Parent and not closed do
+        spawnLightning()
+        task.wait(math.random(12,20)/100)
+    end
+end)
+
+-- CARGA
+for i = 1, 100 do
+    if closed then break end
+    local scale = i / 100
+    barFill.Size = UDim2.new(scale, 0, 1, 0)
+    percent.Text = tostring(i) .. "%"
+    task.wait(0.035)
+end
+
+if not closed then
+    local function miniExplosionAt(xScale)
+        local circ = Instance.new("Frame", bg)
+        circ.AnchorPoint = Vector2.new(0.5, 1)
+        circ.Position = UDim2.new(xScale, 0, 1, -18)
+        circ.Size = UDim2.new(0,12,0,12)
+        circ.BackgroundColor3 = Color3.fromRGB(140,255,255)
+        circ.BorderSizePixel = 0
+        local uic = Instance.new("UICorner", circ)
+        uic.CornerRadius = UDim.new(1,0)
+
+        TweenService:Create(circ, TweenInfo.new(0.35, Enum.EasingStyle.Quad), {
+            Size = UDim2.new(0,140,0,140),
+            BackgroundTransparency = 1,
+            Position = UDim2.new(xScale, 0, 1, -70)
+        }):Play()
+
+        task.delay(0.36, function()
+            if circ and circ.Parent then circ:Destroy() end
+        end)
+    end
+
+    local n = 4
+    for k = 1, n do
+        local x = 0.5 - 230/460 + ( (k-1) * (460/(n-1)) ) / 460
+        x = math.clamp(x, 0.05, 0.95)
+        miniExplosionAt(x)
+        task.wait(0.14)
+    end
+    task.wait(0.45)
+end
+
+closeSplash()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- Estados
+local Features = {
+    SilentAim = false,
+    ESP = false,
+    TeamCheck = true,
+    ShowSkeleton = true,
+    ShowTracer = true,
+    ShowHeadDot = true,
+    ShowInfo = true,
+    FOV = 150,
+    MaxDistance = 1000,
+    AimOffset = 0,
+    SkinChanger = false,
+    Aimbot = false,
+    HoldRMB = true,
+    WallCheck = true,
+    AimbotFOV = 120,
+    AimbotSmooth = 20,
+    TriggerBot = false,
+    TriggerDelay = 0,
+    Speed = false,
+    SpeedValue = 50,
+    JumpHack = false,
+    JumpValue = 100,
+    InfJump = false,
+    Noclip = false,
+    Fly = false,
+    FlySpeed = 60,
+    AntiAFK = false,
+    Chams = false,
+    Fullbright = false,
+    FOVChanger = false,
+    CameraFOV = 90
+}
+
+-- Keybinds storage
+local Keybinds = {
+    SilentAim = nil,
+    ESP = nil,
+    TeamCheck = nil
+}
+
+local espObjects = {}
+local listeningForKey = nil
+
+-- ===== SKIN CHANGER (Rivals) =====
+local skinInitialized = false
+
+local function InitSkinChanger()
+    local HttpService = game:GetService("HttpService")
+    local player = LocalPlayer
+    local controllers = player.PlayerScripts:WaitForChild("Controllers", 10)
+    local EnumLibrary = require(ReplicatedStorage.Modules:WaitForChild("EnumLibrary", 10))
+    if EnumLibrary then EnumLibrary:WaitForEnumBuilder() end
+    local CosmeticLibrary = require(ReplicatedStorage.Modules:WaitForChild("CosmeticLibrary", 10))
+    local ItemLibrary = require(ReplicatedStorage.Modules:WaitForChild("ItemLibrary", 10))
+    local DataController = require(controllers:WaitForChild("PlayerDataController", 10))
+    local equipped, favorites = {}, {}
+    local constructingWeapon, viewingProfile = nil, nil
+    local lastUsedWeapon = nil
+
+    local function cloneCosmetic(name, cosmeticType, options)
+        local base = CosmeticLibrary.Cosmetics[name]
+        if not base then return nil end
+        local data = {}
+        for key, value in pairs(base) do data[key] = value end
+        data.Name = name
+        data.Type = data.Type or cosmeticType
+        data.Seed = data.Seed or math.random(1, 1000000)
+        if EnumLibrary then
+            local success, enumId = pcall(EnumLibrary.ToEnum, EnumLibrary, name)
+            if success and enumId then data.Enum, data.ObjectID = enumId, data.ObjectID or enumId end
+        end
+        if options then
+            if options.inverted ~= nil then data.Inverted = options.inverted end
+            if options.favoritesOnly ~= nil then data.OnlyUseFavorites = options.favoritesOnly end
+        end
+        return data
+    end
+
+    local saveFile = "Rivals-Skinchanger/skins.txt"
+    local function saveConfig()
+        if not writefile then return end
+        pcall(function()
+            local config = {equipped = {}, favorites = favorites}
+            for weapon, cosmetics in pairs(equipped) do
+                config.equipped[weapon] = {}
+                for cosmeticType, cosmeticData in pairs(cosmetics) do
+                    if cosmeticData and cosmeticData.Name then
+                        config.equipped[weapon][cosmeticType] = {
+                            name = cosmeticData.Name, seed = cosmeticData.Seed, inverted = cosmeticData.Inverted
+                        }
+                    end
+                end
+            end
+            makefolder("Rivals-Skinchanger")
+            writefile(saveFile, HttpService:JSONEncode(config))
+        end)
+    end
+
+    local function loadConfig()
+        if not readfile or not isfile or not isfile(saveFile) then return end
+        pcall(function()
+            local config = HttpService:JSONDecode(readfile(saveFile))
+            if config.equipped then
+                for weapon, cosmetics in pairs(config.equipped) do
+                    equipped[weapon] = {}
+                    for cosmeticType, cosmeticData in pairs(cosmetics) do
+                        local cloned = cloneCosmetic(cosmeticData.name, cosmeticType, {inverted = cosmeticData.inverted})
+                        if cloned then cloned.Seed = cosmeticData.seed equipped[weapon][cosmeticType] = cloned end
+                    end
+                end
+            end
+            favorites = config.favorites or {}
+        end)
+    end
+
+    local function isFinisher(cosmetic)
+        if not cosmetic then return false end
+        local t = cosmetic.Type
+        return t == "Finisher" or t == "Finish" or (t and string.find(t:lower(), "finish"))
+    end
+
+    local function isEmote(cosmetic)
+        if not cosmetic then return false end
+        local t = cosmetic.Type
+        return t == "Dance" or t == "Emote"
+    end
+
+    local origOwnsCosmetic = CosmeticLibrary.OwnsCosmetic
+    CosmeticLibrary.OwnsCosmetic = function(self, inventory, name, weapon)
+        if not Features.SkinChanger then return origOwnsCosmetic(self, inventory, name, weapon) end
+        if name:find("MISSING_") then return origOwnsCosmetic(self, inventory, name, weapon) end
+        local cosmetic = CosmeticLibrary.Cosmetics[name]
+        if cosmetic then return true end
+        return origOwnsCosmetic(self, inventory, name, weapon)
+    end
+
+    local originalGet = DataController.Get
+    DataController.Get = function(self, key)
+        local data = originalGet(self, key)
+        if not Features.SkinChanger then return data end
+        if key == "CosmeticInventory" then
+            local proxy = {}
+            if data then for k, v in pairs(data) do
+                local cosmetic = CosmeticLibrary.Cosmetics[k]
+                if cosmetic then proxy[k] = v end
+            end end
+            return setmetatable(proxy, {__index = function(t, k)
+                local cosmetic = CosmeticLibrary.Cosmetics[k]
+                if cosmetic then return true end
+                return nil
+            end})
+        end
+        if key == "FavoritedCosmetics" then
+            local result = data and table.clone(data) or {}
+            for weapon, favs in pairs(favorites) do
+                result[weapon] = result[weapon] or {}
+                for name, isFav in pairs(favs) do
+                    local cosmetic = CosmeticLibrary.Cosmetics[name]
+                    if cosmetic then result[weapon][name] = isFav end
+                end
+            end
+            return result
+        end
+        return data
+    end
+
+    local originalGetWeaponData = DataController.GetWeaponData
+    DataController.GetWeaponData = function(self, weaponName)
+        local data = originalGetWeaponData(self, weaponName)
+        if not data then return nil end
+        if not Features.SkinChanger then return data end
+        local merged = {}
+        for key, value in pairs(data) do merged[key] = value end
+        merged.Name = weaponName
+        if equipped[weaponName] then
+            for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do
+                if cosmeticType ~= "Dances" then merged[cosmeticType] = cosmeticData end
+            end
+        end
+        return merged
+    end
+
+    local FighterController
+    pcall(function() FighterController = require(controllers:WaitForChild("FighterController", 10)) end)
+
+    if hookmetamethod then
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        local dataRemotes = remotes and remotes:FindFirstChild("Data")
+        local equipRemote = dataRemotes and dataRemotes:FindFirstChild("EquipCosmetic")
+        local favoriteRemote = dataRemotes and dataRemotes:FindFirstChild("FavoriteCosmetic")
+        local replicationRemotes = remotes and remotes:FindFirstChild("Replication")
+        local fighterRemotes = replicationRemotes and replicationRemotes:FindFirstChild("Fighter")
+        local useItemRemote = fighterRemotes and fighterRemotes:FindFirstChild("UseItem")
+
+        if equipRemote then
+            local oldNamecall
+            oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+                if getnamecallmethod() ~= "FireServer" then return oldNamecall(self, ...) end
+                if not Features.SkinChanger then return oldNamecall(self, ...) end
+                local args = {...}
+                if useItemRemote and self == useItemRemote then
+                    local objectID = args[1]
+                    if FighterController then
+                        pcall(function()
+                            local fighter = FighterController:GetFighter(player)
+                            if fighter and fighter.Items then
+                                for _, item in pairs(fighter.Items) do
+                                    if item:Get("ObjectID") == objectID then lastUsedWeapon = item.Name break end
+                                end
+                            end
+                        end)
+                    end
+                end
+                if self == equipRemote then
+                    local weaponName, cosmeticType, cosmeticName, options = args[1], args[2], args[3], args[4] or {}
+                    local cosmetic = CosmeticLibrary.Cosmetics[cosmeticName]
+                    -- Finishers and emotes/dances: let the remote fire, but update local state
+                    if cosmetic and (isFinisher(cosmetic) or isEmote(cosmetic)) then
+                        if isEmote(cosmetic) then
+                            equipped.Dances = equipped.Dances or {}
+                            if not cosmeticName or cosmeticName == "None" or cosmeticName == "" then
+                                equipped.Dances[cosmeticType] = nil
+                            else
+                                local cloned = cloneCosmetic(cosmeticName, cosmeticType, {inverted = options.IsInverted, favoritesOnly = options.OnlyUseFavorites})
+                                if cloned then equipped.Dances[cosmeticType] = cloned end
+                            end
+                        else
+                            equipped[weaponName] = equipped[weaponName] or {}
+                            if not cosmeticName or cosmeticName == "None" or cosmeticName == "" then
+                                equipped[weaponName][cosmeticType] = nil
+                                if not next(equipped[weaponName]) then equipped[weaponName] = nil end
+                            else
+                                local cloned = cloneCosmetic(cosmeticName, cosmeticType, {inverted = options.IsInverted, favoritesOnly = options.OnlyUseFavorites})
+                                if cloned then equipped[weaponName][cosmeticType] = cloned end
+                            end
+                        end
+                        saveConfig()
+                        return oldNamecall(self, ...)
+                    end
+                    -- Other cosmetics (skins, charms, wraps)
+                    if cosmeticName and cosmeticName ~= "None" and cosmeticName ~= "" then
+                        local inventory = DataController:Get("CosmeticInventory")
+                        if inventory and rawget(inventory, cosmeticName) then return oldNamecall(self, ...) end
+                    end
+                    equipped[weaponName] = equipped[weaponName] or {}
+                    if not cosmeticName or cosmeticName == "None" or cosmeticName == "" then
+                        equipped[weaponName][cosmeticType] = nil
+                        if not next(equipped[weaponName]) then equipped[weaponName] = nil end
+                    else
+                        local cloned = cloneCosmetic(cosmeticName, cosmeticType, {inverted = options.IsInverted, favoritesOnly = options.OnlyUseFavorites})
+                        if cloned then equipped[weaponName][cosmeticType] = cloned end
+                    end
+                    task.defer(function()
+                        pcall(function() DataController.CurrentData:Replicate("WeaponInventory") end)
+                        task.wait(0.2)
+                        saveConfig()
+                    end)
+                    return
+                end
+                if self == favoriteRemote then
+                    local cosmetic = CosmeticLibrary.Cosmetics[args[2]]
+                    if cosmetic then
+                        favorites[args[1]] = favorites[args[1]] or {}
+                        favorites[args[1]][args[2]] = args[3] or nil
+                        saveConfig()
+                        task.spawn(function() pcall(function() DataController.CurrentData:Replicate("FavoritedCosmetics") end) end)
+                    end
+                    return
+                end
+                return oldNamecall(self, ...)
+            end)
+        end
+    end
+
+    local ClientItem
+    pcall(function() ClientItem = require(player.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem) end)
+
+    if ClientItem and ClientItem._CreateViewModel then
+        local originalCreateViewModel = ClientItem._CreateViewModel
+        ClientItem._CreateViewModel = function(self, viewmodelRef)
+            if not Features.SkinChanger then return originalCreateViewModel(self, viewmodelRef) end
+            local weaponName = self.Name
+            local weaponPlayer = self.ClientFighter and self.ClientFighter.Player
+            constructingWeapon = (weaponPlayer == player) and weaponName or nil
+            if weaponPlayer == player and equipped[weaponName] and viewmodelRef then
+                local dataKey, skinKey, charmKey, wrapKey, nameKey = self:ToEnum("Data"), self:ToEnum("Skin"), self:ToEnum("Charm"), self:ToEnum("Wrap"), self:ToEnum("Name")
+                local data = viewmodelRef[dataKey] or viewmodelRef.Data
+                if data then
+                    if equipped[weaponName].Skin then data[skinKey or "Skin"] = equipped[weaponName].Skin end
+                    if equipped[weaponName].Charm then data[charmKey or "Charm"] = equipped[weaponName].Charm end
+                    if equipped[weaponName].Wrap then data[wrapKey or "Wrap"] = equipped[weaponName].Wrap end
+                    if equipped[weaponName].Skin then data[nameKey or "Name"] = equipped[weaponName].Skin.Name end
+                end
+            end
+            local result = originalCreateViewModel(self, viewmodelRef)
+            constructingWeapon = nil
+            return result
+        end
+    end
+
+    local viewModelModule = player.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem:FindFirstChild("ClientViewModel")
+    if viewModelModule then
+        local ClientViewModel = require(viewModelModule)
+        local originalNew = ClientViewModel.new
+        ClientViewModel.new = function(replicatedData, clientItem)
+            if not Features.SkinChanger then return originalNew(replicatedData, clientItem) end
+            local weaponPlayer = clientItem.ClientFighter and clientItem.ClientFighter.Player
+            local weaponName = constructingWeapon or clientItem.Name
+            if weaponPlayer == player and equipped[weaponName] then
+                local ReplicatedClass = require(ReplicatedStorage.Modules.ReplicatedClass)
+                local dataKey = ReplicatedClass:ToEnum("Data")
+                replicatedData[dataKey] = replicatedData[dataKey] or {}
+                local cosmetics = equipped[weaponName]
+                if cosmetics.Skin then replicatedData[dataKey][ReplicatedClass:ToEnum("Skin")] = cosmetics.Skin end
+                if cosmetics.Charm then replicatedData[dataKey][ReplicatedClass:ToEnum("Charm")] = cosmetics.Charm end
+                if cosmetics.Wrap then replicatedData[dataKey][ReplicatedClass:ToEnum("Wrap")] = cosmetics.Wrap end
+            end
+            local result = originalNew(replicatedData, clientItem)
+            if weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Wrap and result._UpdateWrap then
+                result:_UpdateWrap()
+                task.delay(0.1, function() if not result._destroyed then result:_UpdateWrap() end end)
+            end
+            return result
+        end
+        if ClientViewModel.GetCharm then
+            local originalGetCharmFunc = ClientViewModel.GetCharm
+            ClientViewModel.GetCharm = function(self)
+                local weaponName = self.ClientItem and self.ClientItem.Name
+                local weaponPlayer = self.ClientItem and self.ClientItem.ClientFighter and self.ClientItem.ClientFighter.Player
+                if Features.SkinChanger and weaponName and weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Charm then
+                    return equipped[weaponName].Charm
+                end
+                return originalGetCharmFunc(self)
+            end
+        end
+        if ClientViewModel.GetWrap then
+            local originalGetWrapFunc = ClientViewModel.GetWrap
+            ClientViewModel.GetWrap = function(self)
+                local weaponName = self.ClientItem and self.ClientItem.Name
+                local weaponPlayer = self.ClientItem and self.ClientItem.ClientFighter and self.ClientItem.ClientFighter.Player
+                if Features.SkinChanger and weaponName and weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Wrap then
+                    return equipped[weaponName].Wrap
+                end
+                return originalGetWrapFunc(self)
+            end
+        end
+    end
+
+    local originalGetViewModelImage = ItemLibrary.GetViewModelImageFromWeaponData
+    ItemLibrary.GetViewModelImageFromWeaponData = function(self, weaponData, highRes)
+        if not Features.SkinChanger or not weaponData then return originalGetViewModelImage(self, weaponData, highRes) end
+        local weaponName = weaponData.Name
+        local shouldShowSkin = (weaponData.Skin and equipped[weaponName] and weaponData.Skin == equipped[weaponName].Skin) or (viewingProfile == player and equipped[weaponName] and equipped[weaponName].Skin)
+        if shouldShowSkin and equipped[weaponName] and equipped[weaponName].Skin then
+            local skinInfo = self.ViewModels[equipped[weaponName].Skin.Name]
+            if skinInfo then return skinInfo[highRes and "ImageHighResolution" or "Image"] or skinInfo.Image end
+        end
+        return originalGetViewModelImage(self, weaponData, highRes)
+    end
+
+    pcall(function()
+        local EmoteController = require(controllers:WaitForChild("EmoteController", 10))
+        if EmoteController and EmoteController.GetEmotes then
+            local originalGetEmotes = EmoteController.GetEmotes
+            EmoteController.GetEmotes = function(self)
+                local emotes = originalGetEmotes(self)
+                if not Features.SkinChanger then return emotes end
+                for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
+                    if cosmetic and (cosmetic.Type == "Dance" or cosmetic.Type == "Emote") then
+                        if not emotes[name] then
+                            emotes[name] = {
+                                Name = name,
+                                Type = cosmetic.Type,
+                                ObjectID = cosmetic.ObjectID,
+                                Enum = cosmetic.Enum
+                            }
+                        end
+                    end
+                end
+                return emotes
+            end
+        end
+    end)
+
+    pcall(function()
+        local ViewProfile = require(player.PlayerScripts.Modules.Pages.ViewProfile)
+        if ViewProfile and ViewProfile.Fetch then
+            local originalFetch = ViewProfile.Fetch
+            ViewProfile.Fetch = function(self, targetPlayer)
+                viewingProfile = targetPlayer
+                return originalFetch(self, targetPlayer)
+            end
+        end
+    end)
+
+    loadConfig()
+end
+
+-- Crear ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ProMenu"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Marco principal
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainMenu"
+MainFrame.Size = UDim2.new(0, 320, 0, 480)
+MainFrame.Position = UDim2.new(0, 50, 0, 50)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 10)
+Corner.Parent = MainFrame
+
+local Shadow = Instance.new("ImageLabel")
+Shadow.Name = "Shadow"
+Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+Shadow.BackgroundTransparency = 1
+Shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+Shadow.Size = UDim2.new(1, 40, 1, 40)
+Shadow.ZIndex = -1
+Shadow.Image = "rbxassetid://6014261993"
+Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+Shadow.ImageTransparency = 0.5
+Shadow.ScaleType = Enum.ScaleType.Slice
+Shadow.SliceCenter = Rect.new(49, 49, 450, 450)
+Shadow.Parent = MainFrame
+
+-- Barra de título
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = TitleBar
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -50, 1, 0)
+TitleText.Position = UDim2.new(0, 15, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "Khang Hub"
+TitleText.TextColor3 = Color3.fromRGB(0, 170, 255)
+TitleText.TextSize = 18
+TitleText.Font = Enum.Font.GothamBold
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Parent = TitleBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 14
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Parent = TitleBar
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseBtn
+
+CloseBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+end)
+
+-- Contenedor de opciones
+local ContentFrame = Instance.new("ScrollingFrame")
+ContentFrame.Size = UDim2.new(1, -20, 1, -55)
+ContentFrame.Position = UDim2.new(0, 10, 0, 50)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.ScrollBarThickness = 4
+ContentFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 170, 255)
+ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ContentFrame.Parent = MainFrame
+
+local UIList = Instance.new("UIListLayout")
+UIList.Padding = UDim.new(0, 10)
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+UIList.Parent = ContentFrame
+
+-- Giữ đúng thứ tự tạo của các phần tử
+local layoutCounter = 0
+ContentFrame.ChildAdded:Connect(function(child)
+    if child:IsA("GuiObject") then
+        layoutCounter += 1
+        child.LayoutOrder = layoutCounter
+    end
+end)
+
+UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ContentFrame.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y + 20)
+end)
+
+-- Función para crear Toggle con Keybind
+local function CreateToggle(text, featureKey, default, onChange)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 0, 45)
+    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    Frame.BorderSizePixel = 0
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Frame
+    
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0.5, -10, 1, 0)
+    Label.Position = UDim2.new(0, 12, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = text
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.TextSize = 14
+    Label.Font = Enum.Font.GothamSemibold
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
+    
+    local KeybindBtn = Instance.new("TextButton")
+    KeybindBtn.Size = UDim2.new(0, 50, 0, 28)
+    KeybindBtn.Position = UDim2.new(0.52, 0, 0.5, -14)
+    KeybindBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    KeybindBtn.Text = "[...]"
+    KeybindBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+    KeybindBtn.TextSize = 12
+    KeybindBtn.Font = Enum.Font.GothamBold
+    KeybindBtn.Parent = Frame
+    
+    local KeybindCorner = Instance.new("UICorner")
+    KeybindCorner.CornerRadius = UDim.new(0, 4)
+    KeybindCorner.Parent = KeybindBtn
+    
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Size = UDim2.new(0, 55, 0, 28)
+    ToggleBtn.Position = UDim2.new(1, -65, 0.5, -14)
+    ToggleBtn.BackgroundColor3 = default and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+    ToggleBtn.Text = default and "ON" or "OFF"
+    ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleBtn.TextSize = 12
+    ToggleBtn.Font = Enum.Font.GothamBold
+    ToggleBtn.Parent = Frame
+    
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(0, 4)
+    ToggleCorner.Parent = ToggleBtn
+    
+    local state = default
+    if Features[featureKey] ~= nil then
+        Features[featureKey] = state
+    end
+    
+    local function toggleState()
+        state = not state
+        if Features[featureKey] ~= nil then
+            Features[featureKey] = state
+        end
+        ToggleBtn.Text = state and "ON" or "OFF"
+        TweenService:Create(ToggleBtn, TweenInfo.new(0.2), {
+            BackgroundColor3 = state and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+        }):Play()
+        
+        if onChange then task.spawn(onChange, state) end
+
+        if featureKey == "ESP" and not state then
+            for _, data in pairs(espObjects) do
+                for _, obj in pairs(data.objects) do
+                    if obj then obj.Visible = false end
+                end
+            end
+        end
+    end
+    
+    ToggleBtn.MouseButton1Click:Connect(toggleState)
+    
+    KeybindBtn.MouseButton1Click:Connect(function()
+        if listeningForKey then return end
+        
+        listeningForKey = featureKey
+        KeybindBtn.Text = "[...]"
+        KeybindBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        
+        local dots = 0
+        local connection
+        connection = RunService.Heartbeat:Connect(function()
+            if listeningForKey ~= featureKey then
+                connection:Disconnect()
+                return
+            end
+            dots = (dots + 1) % 4
+            KeybindBtn.Text = "[." .. string.rep(".", dots) .. "]"
+        end)
+        
+        task.delay(5, function()
+            if listeningForKey == featureKey then
+                listeningForKey = nil
+                connection:Disconnect()
+                KeybindBtn.Text = Keybinds[featureKey] and "[" .. Keybinds[featureKey].Name .. "]" or "[...]"
+                KeybindBtn.BackgroundColor3 = Keybinds[featureKey] and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(60, 60, 70)
+            end
+        end)
+    end)
+    
+    if Keybinds[featureKey] then
+        KeybindBtn.Text = "[" .. Keybinds[featureKey].Name .. "]"
+        KeybindBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+    end
+    
+    Frame.Parent = ContentFrame
+    
+    return {
+        frame = Frame,
+        toggle = toggleState,
+        getState = function() return state end
+    }
+end
+
+-- Función para crear Slider
+local function CreateSlider(text, min, max, default, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 0, 60)
+    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Frame
+    
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -20, 0, 25)
+    Label.Position = UDim2.new(0, 12, 0, 5)
+    Label.BackgroundTransparency = 1
+    Label.Text = text .. ": " .. default
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.TextSize = 13
+    Label.Font = Enum.Font.GothamSemibold
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
+    
+    local SliderBg = Instance.new("Frame")
+    SliderBg.Size = UDim2.new(1, -24, 0, 10)
+    SliderBg.Position = UDim2.new(0, 12, 0, 35)
+    SliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    SliderBg.BorderSizePixel = 0
+    SliderBg.Parent = Frame
+    
+    local SliderCorner = Instance.new("UICorner")
+    SliderCorner.CornerRadius = UDim.new(0, 5)
+    SliderCorner.Parent = SliderBg
+    
+    local SliderFill = Instance.new("Frame")
+    SliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    SliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    SliderFill.BorderSizePixel = 0
+    SliderFill.Parent = SliderBg
+    
+    local FillCorner = Instance.new("UICorner")
+    FillCorner.CornerRadius = UDim.new(0, 5)
+    FillCorner.Parent = SliderFill
+    
+    local dragging = false
+    
+    local function updateSlider(input)
+        local pos = math.clamp((input.Position.X - SliderBg.AbsolutePosition.X) / SliderBg.AbsoluteSize.X, 0, 1)
+        local value = math.floor(min + (max - min) * pos)
+        SliderFill.Size = UDim2.new(pos, 0, 1, 0)
+        Label.Text = text .. ": " .. value
+        callback(value)
+    end
+    
+    SliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            updateSlider(input)
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input)
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    Frame.Parent = ContentFrame
+end
+
+-- Sección: AIMBOT
+local AimSection = Instance.new("TextLabel")
+AimSection.Size = UDim2.new(1, 0, 0, 30)
+AimSection.BackgroundTransparency = 1
+AimSection.Text = "AIMBOT"
+AimSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+AimSection.TextSize = 14
+AimSection.Font = Enum.Font.GothamBold
+AimSection.Parent = ContentFrame
+
+CreateToggle("Silent Aim", "SilentAim", false)
+CreateToggle("Team Check", "TeamCheck", true)
+
+CreateSlider("FOV", 50, 500, 150, function(value)
+    Features.FOV = value
+end)
+
+CreateSlider("Aim Offset", -10, 10, 0, function(value)
+    Features.AimOffset = value
+end)
+
+CreateToggle("Aimbot", "Aimbot", false)
+CreateToggle("Hold RMB", "HoldRMB", true)
+CreateToggle("Wall Check", "WallCheck", true)
+
+CreateSlider("Aimbot FOV", 30, 500, 120, function(value)
+    Features.AimbotFOV = value
+end)
+
+CreateSlider("Smoothness", 1, 100, 20, function(value)
+    Features.AimbotSmooth = value
+end)
+
+CreateToggle("Trigger Bot", "TriggerBot", false)
+
+CreateSlider("Trigger Delay (ms)", 0, 300, 0, function(value)
+    Features.TriggerDelay = value
+end)
+
+-- Sección: ESP
+local ESPSection = Instance.new("TextLabel")
+ESPSection.Size = UDim2.new(1, 0, 0, 30)
+ESPSection.BackgroundTransparency = 1
+ESPSection.Text = "ESP"
+ESPSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+ESPSection.TextSize = 14
+ESPSection.Font = Enum.Font.GothamBold
+ESPSection.Parent = ContentFrame
+
+CreateToggle("Enable ESP", "ESP", false)
+CreateToggle("Skeleton", "ShowSkeleton", true)
+CreateToggle("Tracers", "ShowTracer", true)
+CreateToggle("Head Dot", "ShowHeadDot", true)
+CreateToggle("Info Text", "ShowInfo", true)
+
+CreateSlider("Max Distance", 100, 2000, 1000, function(value)
+    Features.MaxDistance = value
+end)
+
+-- Sección: SKINS
+local SkinSection = Instance.new("TextLabel")
+SkinSection.Size = UDim2.new(1, 0, 0, 30)
+SkinSection.BackgroundTransparency = 1
+SkinSection.Text = "SKINS"
+SkinSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+SkinSection.TextSize = 14
+SkinSection.Font = Enum.Font.GothamBold
+SkinSection.Parent = ContentFrame
+
+CreateToggle("Skin Changer", "SkinChanger", false, function(state)
+    if state and not skinInitialized then
+        skinInitialized = true
+        local ok, err = pcall(InitSkinChanger)
+        if not ok then
+            warn("[Khang Hub] Skin Changer error: " .. tostring(err))
+        end
+    end
+end)
+
+-- Sección: PLAYER
+local PlayerSection = Instance.new("TextLabel")
+PlayerSection.Size = UDim2.new(1, 0, 0, 30)
+PlayerSection.BackgroundTransparency = 1
+PlayerSection.Text = "PLAYER"
+PlayerSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+PlayerSection.TextSize = 14
+PlayerSection.Font = Enum.Font.GothamBold
+PlayerSection.Parent = ContentFrame
+
+CreateToggle("Speed Hack", "Speed", false)
+CreateSlider("Walk Speed", 16, 200, 50, function(value)
+    Features.SpeedValue = value
+end)
+
+CreateToggle("Jump Power", "JumpHack", false)
+CreateSlider("Jump Value", 50, 300, 100, function(value)
+    Features.JumpValue = value
+end)
+
+CreateToggle("Infinite Jump", "InfJump", false)
+CreateToggle("Noclip", "Noclip", false)
+CreateToggle("Fly (WASD/Space/Ctrl)", "Fly", false)
+CreateSlider("Fly Speed", 10, 200, 60, function(value)
+    Features.FlySpeed = value
+end)
+CreateToggle("Anti AFK", "AntiAFK", false)
+
+-- Sección: VISUAL
+local VisualSection = Instance.new("TextLabel")
+VisualSection.Size = UDim2.new(1, 0, 0, 30)
+VisualSection.BackgroundTransparency = 1
+VisualSection.Text = "VISUAL"
+VisualSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+VisualSection.TextSize = 14
+VisualSection.Font = Enum.Font.GothamBold
+VisualSection.Parent = ContentFrame
+
+CreateToggle("Chams", "Chams", false)
+CreateToggle("Fullbright", "Fullbright", false)
+CreateToggle("Camera FOV", "FOVChanger", false)
+CreateSlider("FOV Value", 40, 120, 90, function(value)
+    Features.CameraFOV = value
+end)
+
+-- FOV Circle Visual
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1.5
+FOVCircle.NumSides = 64
+FOVCircle.Radius = Features.FOV
+FOVCircle.Filled = false
+FOVCircle.Visible = false
+FOVCircle.Color = Color3.fromRGB(0, 170, 255)
+FOVCircle.Transparency = 0.6
+
+local function isEnemy(player)
+    if not Features.TeamCheck then return true end
+    if not player.Team or not LocalPlayer.Team then return true end
+    return player.Team ~= LocalPlayer.Team
+end
+
+local targetLock = nil
+local lastTargetTime = 0
+local targetLockTime = 0.8
+local lastTargetPosition = nil
+local targetVelocity = Vector3.new(0, 0, 0)
+
+local function getBestTarget()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then 
+        return nil 
+    end
+    
+    local bestTarget = nil
+    local bestScore = math.huge
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local localHRP = LocalPlayer.Character.HumanoidRootPart
+    local localPos = localHRP.Position
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and isEnemy(player) then
+            local head = player.Character:FindFirstChild("Head")
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            
+            if head and hrp and humanoid and humanoid.Health > 0 then
+                local distance = (hrp.Position - localPos).Magnitude
+                
+                if distance <= Features.MaxDistance then
+                    local aimPosition = head.Position + Vector3.new(0, Features.AimOffset, 0)
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(aimPosition)
+                    
+                    if onScreen then
+                        local screenPos2D = Vector2.new(screenPos.X, screenPos.Y)
+                        local distFromCenter = (screenPos2D - screenCenter).Magnitude
+                        
+                        local effectiveFOV = Features.FOV
+                        if distance < 30 then
+                            effectiveFOV = effectiveFOV * 2.0
+                        elseif distance < 100 then
+                            effectiveFOV = effectiveFOV * 1.3
+                        end
+                        
+                        if distFromCenter <= effectiveFOV then
+                            local distanceScore = distance < 50 and distance * 3 or distance * 0.5
+                            local centerScore = distFromCenter * (distance < 30 and 0.3 or 1.0)
+                            local score = centerScore + distanceScore
+                            
+                            if score < bestScore then
+                                bestScore = score
+                                bestTarget = {
+                                    Head = head,
+                                    HumanoidRootPart = hrp,
+                                    Position = aimPosition,
+                                    Distance = distance,
+                                    Player = player
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return bestTarget
+end
+
+local function getTargetWithLock()
+    local currentTime = tick()
+    
+    if targetLock and targetLock.Head and targetLock.Head.Parent then
+        local player = targetLock.Player
+        if player and isEnemy(player) then
+            local hrp = targetLock.HumanoidRootPart
+            local humanoid = targetLock.Head.Parent:FindFirstChildOfClass("Humanoid")
+            
+            if hrp and humanoid and humanoid.Health > 0 then
+                local distance = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                local aimPosition = targetLock.Head.Position + Vector3.new(0, Features.AimOffset, 0)
+                local screenPos, onScreen = Camera:WorldToViewportPoint(aimPosition)
+                
+                if onScreen and distance <= Features.MaxDistance and (currentTime - lastTargetTime) < targetLockTime then
+                    if lastTargetPosition then
+                        targetVelocity = (aimPosition - lastTargetPosition) * 0.5
+                    end
+                    lastTargetPosition = aimPosition
+                    lastTargetTime = currentTime
+                    
+                    targetLock.Position = aimPosition + (targetVelocity * 0.1)
+                    targetLock.Distance = distance
+                    return targetLock
+                end
+            end
+        end
+    end
+    
+    local newTarget = getBestTarget()
+    if newTarget then
+        targetLock = newTarget
+        lastTargetTime = currentTime
+        lastTargetPosition = newTarget.Position
+        targetVelocity = Vector3.new(0, 0, 0)
+    else
+        targetLock = nil
+        lastTargetPosition = nil
+    end
+    
+    return targetLock
+end
+
+-- ===== AIMBOT (camera lock) + TRIGGERBOT =====
+local AimbotCircle = Drawing.new("Circle")
+AimbotCircle.Thickness = 1.5
+AimbotCircle.NumSides = 64
+AimbotCircle.Filled = false
+AimbotCircle.Visible = false
+AimbotCircle.Color = Color3.fromRGB(255, 170, 0)
+AimbotCircle.Transparency = 0.6
+
+local function isVisible(targetPart, targetChar)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {LocalPlayer.Character}
+    local origin = Camera.CFrame.Position
+    local result = Workspace:Raycast(origin, targetPart.Position - origin, params)
+    return result == nil or result.Instance:IsDescendantOf(targetChar)
+end
+
+local function getAimbotTarget()
+    local char = LocalPlayer.Character
+    local localHRP = char and char:FindFirstChild("HumanoidRootPart")
+    if not localHRP then return nil end
+
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local best, bestDist = nil, math.huge
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and isEnemy(player) then
+            local head = player.Character:FindFirstChild("Head")
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if head and hrp and humanoid and humanoid.Health > 0 then
+                local distance = (hrp.Position - localHRP.Position).Magnitude
+                if distance <= Features.MaxDistance then
+                    local aimPos = head.Position + Vector3.new(0, Features.AimOffset, 0)
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(aimPos)
+                    if onScreen then
+                        local d = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+                        if d <= Features.AimbotFOV and d < bestDist then
+                            if not Features.WallCheck or isVisible(head, player.Character) then
+                                bestDist = d
+                                best = aimPos
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return best
+end
+
+local triggerBusy = false
+local function getTriggerTarget()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {char}
+    local result = Workspace:Raycast(Camera.CFrame.Position, Camera.CFrame.LookVector * Features.MaxDistance, params)
+    if not result then return nil end
+    local model = result.Instance:FindFirstAncestorOfClass("Model")
+    local humanoid = model and model:FindFirstChildOfClass("Humanoid")
+    local player = model and Players:GetPlayerFromCharacter(model)
+    if humanoid and humanoid.Health > 0 and player and isEnemy(player) then
+        return player
+    end
+    return nil
+end
+
+local function doClick()
+    if mouse1click then
+        mouse1click()
+    else
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendMouseButtonEvent(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2, 0, true, game, 0)
+        vim:SendMouseButtonEvent(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2, 0, false, game, 0)
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    -- Aimbot
+    AimbotCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    AimbotCircle.Radius = Features.AimbotFOV
+    AimbotCircle.Visible = Features.Aimbot
+
+    if Features.Aimbot then
+        local holding = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+        if not Features.HoldRMB or holding then
+            local targetPos = getAimbotTarget()
+            if targetPos then
+                local camPos = Camera.CFrame.Position
+                local goal = CFrame.new(camPos, targetPos)
+                local factor = math.clamp(1 - (Features.AimbotSmooth / 101), 0.01, 1)
+                Camera.CFrame = Camera.CFrame:Lerp(goal, factor)
+            end
+        end
+    end
+
+    -- Triggerbot
+    if Features.TriggerBot and not triggerBusy and getTriggerTarget() then
+        triggerBusy = true
+        task.spawn(function()
+            local delayMs = Features.TriggerDelay
+            if delayMs > 0 then task.wait(delayMs / 1000) end
+            if Features.TriggerBot and getTriggerTarget() then
+                doClick()
+            end
+            task.wait(0.08)
+            triggerBusy = false
+        end)
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    FOVCircle.Radius = Features.FOV
+    FOVCircle.Visible = Features.SilentAim
+    
+    if Features.SilentAim and LocalPlayer.Character then
+        local target = getTargetWithLock()
+        
+        if target and target.Head then
+            local targetPos = target.Position
+            local currentCFrame = Camera.CFrame
+            
+            local smoothness = target.Distance < 30 and 0.35 or 0.15
+            if target.Distance < 10 then
+                smoothness = 0.5
+            end
+            
+            local targetDirection = (targetPos - currentCFrame.Position).Unit
+            local targetCFrame = CFrame.new(currentCFrame.Position, currentCFrame.Position + targetDirection)
+            
+            Camera.CFrame = currentCFrame:Lerp(targetCFrame, smoothness)
+        end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and Features.SilentAim then
+        local target = getTargetWithLock()
+        if target and target.Head then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+            
+            if ReplicatedStorage:FindFirstChild("Remotes") then
+                for _, remote in pairs(ReplicatedStorage.Remotes:GetChildren()) do
+                    if remote:IsA("RemoteEvent") then
+                        local name = remote.Name:lower()
+                        if name:match("attack") or name:match("hit") or name:match("damage") or name:match("combat") then
+                            pcall(function()
+                                remote:FireServer(target.Position)
+                            end)
+                        end
+                    end
+                end
+            end
+            
+            if target.Distance < 15 then
+                pcall(function()
+                    local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                    if tool then
+                        tool:Activate()
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if listeningForKey then
+        if input.KeyCode ~= Enum.KeyCode.Unknown then
+            Keybinds[listeningForKey] = input.KeyCode
+            for _, child in pairs(ContentFrame:GetDescendants()) do
+                if child:IsA("TextButton") and child.Text:match("%[%.%.%.%]") and child.BackgroundColor3 == Color3.fromRGB(0, 170, 255) then
+                    child.Text = "[" .. input.KeyCode.Name .. "]"
+                    child.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+                    break
+                end
+            end
+            listeningForKey = nil
+        end
+        return
+    end
+    
+    if gameProcessed then return end
+    
+    for feature, key in pairs(Keybinds) do
+        if input.KeyCode == key then
+            if feature == "SilentAim" then
+                Features.SilentAim = not Features.SilentAim
+                for _, child in pairs(ContentFrame:GetDescendants()) do
+                    if child:IsA("TextButton") and child.Parent:FindFirstChild("TextLabel") and child.Parent.TextLabel.Text == "Silent Aim" then
+                        child.Text = Features.SilentAim and "ON" or "OFF"
+                        child.BackgroundColor3 = Features.SilentAim and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+                    end
+                end
+            elseif feature == "ESP" then
+                Features.ESP = not Features.ESP
+                if not Features.ESP then
+                    for _, data in pairs(espObjects) do
+                        for _, obj in pairs(data.objects) do
+                            if obj then obj.Visible = false end
+                        end
+                    end
+                end
+                for _, child in pairs(ContentFrame:GetDescendants()) do
+                    if child:IsA("TextButton") and child.Parent:FindFirstChild("TextLabel") and child.Parent.TextLabel.Text == "Enable ESP" then
+                        child.Text = Features.ESP and "ON" or "OFF"
+                        child.BackgroundColor3 = Features.ESP and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+                    end
+                end
+            elseif feature == "TeamCheck" then
+                Features.TeamCheck = not Features.TeamCheck
+                for _, child in pairs(ContentFrame:GetDescendants()) do
+                    if child:IsA("TextButton") and child.Parent:FindFirstChild("TextLabel") and child.Parent.TextLabel.Text == "Team Check" then
+                        child.Text = Features.TeamCheck and "ON" or "OFF"
+                        child.BackgroundColor3 = Features.TeamCheck and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local bodyConnections = {
+    {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
+    {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"},
+    {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"}
+}
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+    
+    local objects = {}
+    
+    for i = 1, 14 do
+        local line = Drawing.new("Line")
+        line.Thickness = 1.5
+        line.Transparency = 0.8
+        line.Visible = false
+        table.insert(objects, line)
+    end
+    
+    local headCircle = Drawing.new("Circle")
+    headCircle.Thickness = 2
+    headCircle.NumSides = 12
+    headCircle.Radius = 4
+    headCircle.Filled = true
+    headCircle.Visible = false
+    table.insert(objects, headCircle)
+    
+    local tracer = Drawing.new("Line")
+    tracer.Thickness = 1
+    tracer.Transparency = 0.5
+    tracer.Visible = false
+    table.insert(objects, tracer)
+    
+    local infoText = Drawing.new("Text")
+    infoText.Size = 13
+    infoText.Center = true
+    infoText.Outline = true
+    infoText.Font = 2
+    infoText.Visible = false
+    table.insert(objects, infoText)
+    
+    espObjects[player] = {objects = objects}
+end
+
+local function removeESP(player)
+    if espObjects[player] then
+        for _, obj in pairs(espObjects[player].objects) do
+            pcall(function() obj:Remove() end)
+        end
+        espObjects[player] = nil
+    end
+end
+
+Players.PlayerRemoving:Connect(removeESP)
+
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        createESP(player)
+    end
+end
+
+Players.PlayerAdded:Connect(createESP)
+
+RunService.RenderStepped:Connect(function()
+    for player, data in pairs(espObjects) do
+        local character = player.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+        
+        local shouldShow = Features.ESP and character and humanoid and humanoid.Health > 0 and hrp
+        
+        if shouldShow then
+            local distance = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if distance <= Features.MaxDistance then
+                local isEnemyPlayer = isEnemy(player)
+                local color = isEnemyPlayer and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(50, 255, 50)
+                local objIndex = 1
+                
+                if Features.ShowSkeleton then
+                    for _, conn in ipairs(bodyConnections) do
+                        local part1 = character:FindFirstChild(conn[1])
+                        local part2 = character:FindFirstChild(conn[2])
+                        local line = data.objects[objIndex]
+                        
+                        if part1 and part2 and line then
+                            local p1, onScreen1 = Camera:WorldToViewportPoint(part1.Position)
+                            local p2, onScreen2 = Camera:WorldToViewportPoint(part2.Position)
+                            
+                            if onScreen1 or onScreen2 then
+                                line.From = Vector2.new(p1.X, p1.Y)
+                                line.To = Vector2.new(p2.X, p2.Y)
+                                line.Color = color
+                                line.Visible = true
+                            else
+                                line.Visible = false
+                            end
+                        elseif line then
+                            line.Visible = false
+                        end
+                        objIndex = objIndex + 1
+                    end
+                else
+                    for i = 1, 14 do
+                        if data.objects[i] then data.objects[i].Visible = false end
+                    end
+                    objIndex = 15
+                end
+                
+                local head = character:FindFirstChild("Head")
+                local headCircle = data.objects[15]
+                if Features.ShowHeadDot and head and headCircle then
+                    local headPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    if onScreen then
+                        headCircle.Position = Vector2.new(headPos.X, headPos.Y)
+                        headCircle.Color = color
+                        headCircle.Visible = true
+                    else
+                        headCircle.Visible = false
+                    end
+                elseif headCircle then
+                    headCircle.Visible = false
+                end
+                
+                local tracer = data.objects[16]
+                if Features.ShowTracer and tracer then
+                    local hrpPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                    if onScreen then
+                        tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        tracer.To = Vector2.new(hrpPos.X, hrpPos.Y)
+                        tracer.Color = color
+                        tracer.Visible = true
+                    else
+                        tracer.Visible = false
+                    end
+                elseif tracer then
+                    tracer.Visible = false
+                end
+                
+                local infoText = data.objects[17]
+                if Features.ShowInfo and infoText and head then
+                    local headPos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.2, 0))
+                    if onScreen then
+                        infoText.Position = Vector2.new(headPos.X, headPos.Y)
+                        infoText.Text = string.format("%s [%d%%] (%dm)", player.Name, math.floor(humanoid.Health), math.floor(distance))
+                        infoText.Color = color
+                        infoText.Visible = true
+                    else
+                        infoText.Visible = false
+                    end
+                elseif infoText then
+                    infoText.Visible = false
+                end
+            else
+                for _, obj in pairs(data.objects) do
+                    obj.Visible = false
+                end
+            end
+        else
+            if data and data.objects then
+                for _, obj in pairs(data.objects) do
+                    obj.Visible = false
+                end
+            end
+        end
+    end
+end)
+
+-- ===== PLAYER / VISUAL EXTRAS =====
+local function getHumanoid()
+    local c = LocalPlayer.Character
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function getRoot()
+    local c = LocalPlayer.Character
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local savedWalkSpeed, speedActive = 16, false
+local savedJump, jumpActive = 50, false
+local savedFOV, fovActive = Camera.FieldOfView, false
+local flyBV, flyBG = nil, nil
+local lightingBackup, fullbrightActive = nil, false
+local chams = {}
+
+local function stopFly()
+    if flyBV then flyBV:Destroy() flyBV = nil end
+    if flyBG then flyBG:Destroy() flyBG = nil end
+    local hum = getHumanoid()
+    if hum then hum.PlatformStand = false end
+end
+
+local function updateChams()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local char = player.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local hl = chams[player]
+            if Features.Chams and char and hum and hum.Health > 0 then
+                if not hl or not hl.Parent then
+                    hl = Instance.new("Highlight")
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    hl.FillTransparency = 0.5
+                    hl.OutlineTransparency = 0
+                    hl.Parent = CoreGui
+                    chams[player] = hl
+                end
+                hl.Adornee = char
+                hl.FillColor = isEnemy(player) and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(50, 255, 50)
+                hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                hl.Enabled = true
+            elseif hl then
+                hl.Enabled = false
+            end
+        end
+    end
+end
+
+Players.PlayerRemoving:Connect(function(player)
+    if chams[player] then
+        chams[player]:Destroy()
+        chams[player] = nil
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    local hum, root = getHumanoid(), getRoot()
+
+    -- Speed
+    if hum then
+        if Features.Speed then
+            if not speedActive then savedWalkSpeed = hum.WalkSpeed speedActive = true end
+            hum.WalkSpeed = Features.SpeedValue
+        elseif speedActive then
+            hum.WalkSpeed = savedWalkSpeed
+            speedActive = false
+        end
+
+        -- Jump power
+        if Features.JumpHack then
+            if not jumpActive then savedJump = hum.JumpPower jumpActive = true end
+            hum.UseJumpPower = true
+            hum.JumpPower = Features.JumpValue
+        elseif jumpActive then
+            hum.JumpPower = savedJump
+            jumpActive = false
+        end
+    end
+
+    -- Fly
+    if Features.Fly and hum and root then
+        if not flyBV or flyBV.Parent ~= root then
+            stopFly()
+            flyBV = Instance.new("BodyVelocity")
+            flyBV.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+            flyBV.Velocity = Vector3.zero
+            flyBV.Parent = root
+            flyBG = Instance.new("BodyGyro")
+            flyBG.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+            flyBG.P = 9e4
+            flyBG.Parent = root
+        end
+        hum.PlatformStand = true
+        local cam = Camera.CFrame
+        local dir = Vector3.zero
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cam.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cam.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cam.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cam.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.yAxis end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.yAxis end
+        flyBV.Velocity = dir.Magnitude > 0 and dir.Unit * Features.FlySpeed or Vector3.zero
+        flyBG.CFrame = cam
+    elseif flyBV then
+        stopFly()
+    end
+
+    -- Chams
+    updateChams()
+end)
+
+-- Noclip
+RunService.Stepped:Connect(function()
+    if Features.Noclip and LocalPlayer.Character then
+        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+end)
+
+-- Infinite jump
+UserInputService.JumpRequest:Connect(function()
+    if Features.InfJump then
+        local hum = getHumanoid()
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+-- Fullbright + Camera FOV
+RunService.RenderStepped:Connect(function()
+    if Features.Fullbright then
+        if not fullbrightActive then
+            lightingBackup = {
+                Brightness = Lighting.Brightness,
+                ClockTime = Lighting.ClockTime,
+                FogEnd = Lighting.FogEnd,
+                GlobalShadows = Lighting.GlobalShadows,
+                Ambient = Lighting.Ambient,
+                OutdoorAmbient = Lighting.OutdoorAmbient
+            }
+            fullbrightActive = true
+        end
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 1e9
+        Lighting.GlobalShadows = false
+        Lighting.Ambient = Color3.fromRGB(178, 178, 178)
+        Lighting.OutdoorAmbient = Color3.fromRGB(178, 178, 178)
+    elseif fullbrightActive then
+        for key, value in pairs(lightingBackup) do Lighting[key] = value end
+        fullbrightActive = false
+    end
+
+    if Features.FOVChanger then
+        if not fovActive then savedFOV = Camera.FieldOfView fovActive = true end
+        Camera.FieldOfView = Features.CameraFOV
+    elseif fovActive then
+        Camera.FieldOfView = savedFOV
+        fovActive = false
+    end
+end)
+
+-- Anti AFK
+LocalPlayer.Idled:Connect(function()
+    if Features.AntiAFK then
+        local vu = game:GetService("VirtualUser")
+        vu:CaptureController()
+        vu:ClickButton2(Vector2.new())
+    end
+end)
+
+-- Phím RightShift: ẩn/hiện menu
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed or listeningForKey then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end)
