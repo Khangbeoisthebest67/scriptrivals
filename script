@@ -1,3 +1,10 @@
+-- Chạy lại script (hoặc autoexec chạy trùng) sẽ tự gỡ bản cũ trước
+local khangEnv = (getgenv and getgenv()) or _G
+if type(khangEnv.KhangHubUnload) == "function" then
+    pcall(khangEnv.KhangHubUnload)
+    khangEnv.KhangHubUnload = nil
+end
+
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
@@ -291,15 +298,37 @@ local Features = {
     SkyStars = 0,
     SkyDensity = 35,
     SkyRainbow = false,
-    PanelStyle = 1
+    PanelStyle = 1,
+    SkinDebug = false,
+    EmotePlay = false,
+    EmoteIndex = 1,
+    EmoteCustomId = "",
+    EmoteLoop = false,
+    EmoteSpeed = 100,
+    EmoteStopMove = true,
+    CustomFinisher = false,
+    FinisherType = 1,
+    FinisherRange = 150,
+    FinisherOnScreen = true,
+    FinisherEmote = false,
+    ConfigAutoSave = true,
+    ConfigAutoLoad = true,
+    AutoExec = false,
+    AutoExecSource = "khang_hub.lua",
+    SkinPackIndex = 1,
+    SkinPackName = "",
+    SkinPackImport = "",
+    SkinPackSelected = "",
+    SkinPackAuto = false
 }
 
 -- Khai báo trước để nút trong menu gọi được
 local enableBoost, disableBoost
 local enableTexturePack, disableTexturePack, enableDarkener, disableDarkener, setDarkness, runMcTexture, unloadHub
-local enableSky, disableSky, setPanelStyle, runDeleteScript, cycleSkyPreset
+local enableSky, disableSky, setPanelStyle, cycleSkyPreset
 local khangUnloaded = false
 local ANTIAIM_MODES = {{name = "Spin"}, {name = "Jitter"}, {name = "Backwards"}, {name = "Random"}}
+local Custom = {}
 
 -- Keybinds storage
 local Keybinds = {
@@ -326,6 +355,10 @@ local function InitSkinChanger()
     local equipped, favorites = {}, {}
     local constructingWeapon, viewingProfile = nil, nil
     local lastUsedWeapon = nil
+
+    local function dbg(...)
+        if Features.SkinDebug then print("[Khang Skin]", ...) end
+    end
 
     local function cloneCosmetic(name, cosmeticType, options)
         local base = CosmeticLibrary.Cosmetics[name]
@@ -392,7 +425,12 @@ local function InitSkinChanger()
     local function isEmote(cosmetic)
         if not cosmetic then return false end
         local t = cosmetic.Type
-        return t == "Dance" or t == "Emote"
+        if t == "Dance" or t == "Emote" then return true end
+        if type(t) == "string" then
+            local lower = t:lower()
+            return lower:find("dance") ~= nil or lower:find("emote") ~= nil
+        end
+        return false
     end
 
     local origOwnsCosmetic = CosmeticLibrary.OwnsCosmetic
@@ -484,6 +522,9 @@ local function InitSkinChanger()
                 if self == equipRemote then
                     local weaponName, cosmeticType, cosmeticName, options = args[1], args[2], args[3], args[4] or {}
                     local cosmetic = CosmeticLibrary.Cosmetics[cosmeticName]
+                    dbg("EquipCosmetic", weaponName, cosmeticType, cosmeticName,
+                        "Type=" .. tostring(cosmetic and cosmetic.Type),
+                        isFinisher(cosmetic) and "-> finisher" or (isEmote(cosmetic) and "-> emote" or "-> other"))
                     -- Finishers and emotes/dances: let the remote fire, but update local state
                     if cosmetic and (isFinisher(cosmetic) or isEmote(cosmetic)) then
                         if isEmote(cosmetic) then
@@ -636,7 +677,7 @@ local function InitSkinChanger()
                 local emotes = originalGetEmotes(self)
                 if not Features.SkinChanger then return emotes end
                 for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
-                    if cosmetic and (cosmetic.Type == "Dance" or cosmetic.Type == "Emote") then
+                    if cosmetic and isEmote(cosmetic) then
                         if not emotes[name] then
                             emotes[name] = {
                                 Name = name,
@@ -663,8 +704,83 @@ local function InitSkinChanger()
         end
     end)
 
+    -- ---------- Hàm dùng cho Skin Packs ----------
+    -- Chụp lại loadout đang trang bị: [vũ khí][loại] = {name, seed, inverted}
+    Custom.skinGetEquipped = function()
+        local out = {}
+        for weapon, cosmetics in pairs(equipped) do
+            out[weapon] = {}
+            for cType, d in pairs(cosmetics) do
+                if d and d.Name then
+                    out[weapon][cType] = {name = d.Name, seed = d.Seed, inverted = d.Inverted}
+                end
+            end
+        end
+        return out
+    end
+
+    -- Áp dụng cả pack: thay toàn bộ loadout hiện tại
+    Custom.skinApply = function(pack)
+        for key in pairs(equipped) do equipped[key] = nil end
+        local applied, missing = 0, 0
+        for weapon, cosmetics in pairs(pack) do
+            for cType, d in pairs(cosmetics) do
+                local cloned = type(d) == "table" and d.name and cloneCosmetic(d.name, cType, {inverted = d.inverted})
+                if cloned then
+                    if d.seed then cloned.Seed = d.seed end
+                    equipped[weapon] = equipped[weapon] or {}
+                    equipped[weapon][cType] = cloned
+                    applied += 1
+                else
+                    missing += 1
+                end
+            end
+        end
+        pcall(function() DataController.CurrentData:Replicate("WeaponInventory") end)
+        saveConfig()
+        return applied, missing
+    end
+
+    -- Ghi toàn bộ tên cosmetic ra file để biết đúng tên khi tự làm pack
+    Custom.skinDump = function()
+        local lines = {}
+        for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
+            local parts = {tostring(name)}
+            if type(cosmetic) == "table" then
+                local fields = {}
+                for k, v in pairs(cosmetic) do
+                    local t = type(v)
+                    if t == "string" or t == "number" or t == "boolean" then
+                        table.insert(fields, tostring(k) .. "=" .. tostring(v))
+                    end
+                end
+                table.sort(fields)
+                for _, field in ipairs(fields) do table.insert(parts, field) end
+            end
+            table.insert(lines, table.concat(parts, " | "))
+        end
+        table.sort(lines)
+        pcall(function()
+            if makefolder and isfolder and not isfolder("KhangHub") then makefolder("KhangHub") end
+            writefile("KhangHub/cosmetics.txt", table.concat(lines, "\n"))
+        end)
+        return #lines
+    end
+
     loadConfig()
 end
+
+-- Cài hook sớm (giống script skin gốc) để UI emote/finisher của game đọc dữ liệu đã qua hook.
+-- Hook chỉ có tác dụng khi bật Skin Changer.
+task.spawn(function()
+    if not skinInitialized then
+        skinInitialized = true
+        local ok, err = pcall(InitSkinChanger)
+        if not ok then
+            warn("[Khang Hub] Skin Changer error: " .. tostring(err))
+        end
+    end
+end)
 
 -- Crear ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
@@ -1101,6 +1217,8 @@ CreateToggle("Skin Changer", "SkinChanger", false, function(state)
     end
 end)
 
+CreateToggle("Skin Debug Log (F9)", "SkinDebug", false)
+
 -- Sección: PLAYER
 local PlayerSection = Instance.new("TextLabel")
 PlayerSection.Size = UDim2.new(1, 0, 0, 30)
@@ -1212,6 +1330,125 @@ CreateSlider("Density %", 0, 100, 35, function(value)
 end, "SkyDensity")
 CreateToggle("Rainbow Sky", "SkyRainbow", false)
 
+CreateSection("CUSTOM EMOTE / FINISHER")
+CreateToggle("Play Emote", "EmotePlay", false, function(state)
+    Custom.onEmoteToggle(state)
+end)
+CreateButton("Emote: bấm để đổi", function(btn)
+    btn.Text = "Emote: " .. Custom.nextEmote()
+end)
+CreateToggle("Loop Emote", "EmoteLoop", false)
+CreateToggle("Custom Finisher", "CustomFinisher", false)
+CreateButton("Finisher Effect: bấm để đổi", function(btn)
+    btn.Text = "Finisher Effect: " .. Custom.nextFinisher()
+end)
+CreateSlider("Finisher Range", 20, 300, 150, function(value)
+    Features.FinisherRange = value
+end, "FinisherRange")
+CreateToggle("Kill Emote", "FinisherEmote", false)
+CreateButton("Test Finisher Effect", function()
+    Custom.testFinisher()
+end)
+
+local function CreateTextBox(labelText, featureKey, placeholder)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 0, 45)
+    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    Frame.BorderSizePixel = 0
+
+    local FrameCorner = Instance.new("UICorner")
+    FrameCorner.CornerRadius = UDim.new(0, 8)
+    FrameCorner.Parent = Frame
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0.4, -10, 1, 0)
+    Label.Position = UDim2.new(0, 12, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = labelText
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.TextSize = 13
+    Label.Font = Enum.Font.GothamSemibold
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
+
+    local Box = Instance.new("TextBox")
+    Box.Size = UDim2.new(0.6, -20, 0, 28)
+    Box.Position = UDim2.new(0.4, 8, 0.5, -14)
+    Box.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    Box.BorderSizePixel = 0
+    Box.Text = tostring(Features[featureKey] or "")
+    Box.PlaceholderText = placeholder or ""
+    Box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Box.PlaceholderColor3 = Color3.fromRGB(150, 150, 160)
+    Box.TextSize = 12
+    Box.Font = Enum.Font.Gotham
+    Box.ClearTextOnFocus = false
+    Box.Parent = Frame
+
+    local BoxCorner = Instance.new("UICorner")
+    BoxCorner.CornerRadius = UDim.new(0, 4)
+    BoxCorner.Parent = Box
+
+    Box.FocusLost:Connect(function()
+        Features[featureKey] = Box.Text
+    end)
+
+    table.insert(LegacySync, function()
+        Box.Text = tostring(Features[featureKey] or "")
+    end)
+
+    Frame.Parent = ContentFrame
+end
+
+CreateSection("CONFIG / AUTO EXECUTE")
+CreateToggle("Auto Save Config", "ConfigAutoSave", true)
+CreateToggle("Load Config On Start", "ConfigAutoLoad", true)
+CreateButton("Save Config Now", function()
+    Custom.saveNow()
+end)
+CreateButton("Load Config Now", function()
+    Custom.loadConfig()
+end)
+CreateButton("Delete Saved Config", function()
+    Custom.deleteConfig()
+end)
+CreateToggle("Auto Execute", "AutoExec", false, function(state)
+    Custom.onAutoExec(state)
+end)
+CreateTextBox("Script file/URL", "AutoExecSource", "khang_hub.lua")
+CreateButton("Install Autoexec File", function()
+    Custom.installAutoexecFile()
+end)
+
+CreateSection("SKIN PACKS")
+CreateButton("Pack: bấm để đổi", function(btn)
+    btn.Text = "Pack: " .. Custom.nextPack()
+end)
+CreateButton("Apply Pack", function()
+    Custom.applyPack()
+end)
+CreateTextBox("New Pack Name", "SkinPackName", "My Pack")
+CreateButton("Save Current As Pack", function()
+    Custom.savePack()
+end)
+CreateButton("Export Pack (copy)", function()
+    Custom.exportPack()
+end)
+CreateTextBox("Import String", "SkinPackImport", "KHANGPACK1:...")
+CreateButton("Import Pack", function()
+    Custom.importPackFromTextbox()
+end)
+CreateButton("Import From File", function()
+    Custom.importPackFromFile()
+end)
+CreateButton("Delete Pack", function()
+    Custom.deletePack()
+end)
+CreateToggle("Auto Apply Pack On Start", "SkinPackAuto", false)
+CreateButton("Dump Cosmetic Names", function()
+    Custom.dumpCosmetics()
+end)
+
 -- Sección: PERFORMANCE
 local PerfSection = Instance.new("TextLabel")
 PerfSection.Size = UDim2.new(1, 0, 0, 30)
@@ -1284,9 +1521,7 @@ CreateButton("❌ UNLOAD KHANG HUB", function()
     unloadHub()
 end, Color3.fromRGB(150, 40, 40))
 
-CreateButton("Delete Script", function(btn)
-    runDeleteScript(btn)
-end, Color3.fromRGB(190, 40, 40))
+
 
 -- FOV Circle Visual
 local FOVCircle = Drawing.new("Circle")
@@ -1925,11 +2160,29 @@ RunService.Heartbeat:Connect(function(dt)
     updateChams()
 end)
 
--- Noclip
+-- Noclip (lưu CanCollide gốc để trả lại khi tắt)
+local noclipBackup = setmetatable({}, {__mode = "k"})
+local noclipActive = false
+
 RunService.Stepped:Connect(function()
-    if Features.Noclip and LocalPlayer.Character then
-        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
+    local char = LocalPlayer.Character
+    if Features.Noclip and char then
+        noclipActive = true
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                if noclipBackup[part] == nil then
+                    noclipBackup[part] = part.CanCollide
+                end
+                part.CanCollide = false
+            end
+        end
+    elseif noclipActive then
+        noclipActive = false
+        for part, original in pairs(noclipBackup) do
+            if part and part.Parent then
+                part.CanCollide = original
+            end
+            noclipBackup[part] = nil
         end
     end
 end)
@@ -2528,6 +2781,11 @@ function unloadHub()
     if khangUnloaded then return end
     khangUnloaded = true
 
+    -- Lưu cấu hình TRƯỚC khi tắt toàn bộ tính năng bên dưới
+    pcall(function()
+        if Features.ConfigAutoSave then Custom.saveConfig(true) end
+    end)
+
     -- Tắt mọi tính năng để các vòng lặp tự khôi phục trạng thái (speed, fly, fullbright, FOV, camera...)
     for key, value in pairs(Features) do
         if type(value) == "boolean" then Features[key] = false end
@@ -2538,6 +2796,7 @@ function unloadHub()
     pcall(disableDarkener)
     pcall(disableBoost)
     pcall(disableSky)
+    pcall(function() Custom.stopEmote() end)
 
     task.wait(0.3)
 
@@ -2556,6 +2815,7 @@ function unloadHub()
 
     pcall(function() ScreenGui:Destroy() end)
     pcall(function() collectgarbage("collect") end)
+    pcall(function() khangEnv.KhangHubUnload = nil end)
 end
 
 showNotification("Khang Hub", "Script loaded! RightShift = ẩn/hiện menu", 5)
@@ -2750,6 +3010,550 @@ do
     end)
 end
 
+-- ===== CUSTOM EMOTES + CUSTOM FINISHERS (chạy phía client) =====
+-- Thêm emote của riêng bạn ở đây: {name = "Tên", id = AnimationID} (chỉ R15, animation phải dùng được trong game)
+local USER_EMOTES = {
+    -- {name = "My Emote", id = 0},
+}
+
+Custom.EMOTES = {
+    {name = "Wave", id = 507770239},
+    {name = "Point", id = 507770453},
+    {name = "Cheer", id = 507770677},
+    {name = "Laugh", id = 507770818},
+    {name = "Dance 1", id = 507771019},
+    {name = "Dance 2", id = 507776043},
+    {name = "Dance 3", id = 507777268},
+}
+for _, emote in ipairs(USER_EMOTES) do
+    table.insert(Custom.EMOTES, {name = emote.name, id = emote.id})
+end
+table.insert(Custom.EMOTES, {name = "Custom ID", custom = true})
+
+Custom.FINISHERS = {
+    {name = "Lightning"},
+    {name = "Explosion"},
+    {name = "Freeze"},
+    {name = "Disintegrate"},
+    {name = "Confetti"},
+}
+
+do
+    local Debris = game:GetService("Debris")
+    local emoteTrack = nil
+
+    local function notifyEmoteState()
+        if Custom.emoteStateChanged then Custom.emoteStateChanged() end
+    end
+
+    -- ---------- Emote ----------
+    function Custom.stopEmote()
+        local track = emoteTrack
+        emoteTrack = nil
+        if track then
+            pcall(function()
+                track:Stop()
+                track:Destroy()
+            end)
+        end
+    end
+
+    function Custom.playEmote()
+        Custom.stopEmote()
+        local hum = getHumanoid()
+        if not hum then return false end
+
+        local animator = hum:FindFirstChildOfClass("Animator")
+        if not animator then
+            animator = Instance.new("Animator")
+            animator.Parent = hum
+        end
+
+        local entry = Custom.EMOTES[Features.EmoteIndex] or Custom.EMOTES[1]
+        local rawId = entry.custom and Features.EmoteCustomId or entry.id
+        local id = string.match(tostring(rawId), "%d+")
+        if not id then
+            warn("[Khang Hub] Emote: Animation ID không hợp lệ")
+            return false
+        end
+
+        local anim = Instance.new("Animation")
+        anim.AnimationId = "rbxassetid://" .. id
+        local ok, track = pcall(function() return animator:LoadAnimation(anim) end)
+        if not ok or not track then
+            warn("[Khang Hub] Emote: không tải được animation " .. id)
+            return false
+        end
+
+        track.Priority = Enum.AnimationPriority.Action4
+        track.Looped = Features.EmoteLoop and true or false
+        track:Play()
+        track:AdjustSpeed(Features.EmoteSpeed / 100)
+        emoteTrack = track
+
+        track.Stopped:Connect(function()
+            if emoteTrack == track then
+                emoteTrack = nil
+                if Features.EmotePlay then
+                    Features.EmotePlay = false
+                    notifyEmoteState()
+                end
+            end
+        end)
+        return true
+    end
+
+    function Custom.onEmoteToggle(state)
+        if state then
+            if not Custom.playEmote() then
+                Features.EmotePlay = false
+                notifyEmoteState()
+            end
+        else
+            Custom.stopEmote()
+        end
+    end
+
+    function Custom.nextEmote()
+        Features.EmoteIndex = (Features.EmoteIndex % #Custom.EMOTES) + 1
+        return Custom.EMOTES[Features.EmoteIndex].name
+    end
+
+    function Custom.nextFinisher()
+        Features.FinisherType = (Features.FinisherType % #Custom.FINISHERS) + 1
+        return Custom.FINISHERS[Features.FinisherType].name
+    end
+
+    -- Tự dừng emote khi di chuyển
+    RunService.Heartbeat:Connect(function()
+        if emoteTrack and Features.EmoteStopMove then
+            local hum = getHumanoid()
+            if hum and hum.MoveDirection.Magnitude > 0.1 then
+                Custom.stopEmote()
+                if Features.EmotePlay then
+                    Features.EmotePlay = false
+                    notifyEmoteState()
+                end
+            end
+        end
+    end)
+
+    -- ---------- Hiệu ứng finisher ----------
+    local function bolt(a, b)
+        local length = (b - a).Magnitude
+        if length < 0.05 then return end
+        local part = Instance.new("Part")
+        part.Anchored = true
+        part.CanCollide = false
+        part.CanQuery = false
+        part.CanTouch = false
+        part.CastShadow = false
+        part.Material = Enum.Material.Neon
+        part.Color = Color3.fromRGB(140, 235, 255)
+        part.Size = Vector3.new(0.4, 0.4, length)
+        part.CFrame = CFrame.lookAt((a + b) / 2, b)
+        part.Parent = Workspace
+        TweenService:Create(part, TweenInfo.new(0.4), {Transparency = 1}):Play()
+        Debris:AddItem(part, 0.5)
+    end
+
+    local effects = {}
+
+    effects[1] = function(char, pos) -- Lightning
+        for _ = 1, 3 do
+            local top = pos + Vector3.new(math.random(-6, 6), 70, math.random(-6, 6))
+            local prev = top
+            for step = 1, 8 do
+                local target = top:Lerp(pos, step / 8)
+                if step < 8 then
+                    target += Vector3.new(math.random(-3, 3), 0, math.random(-3, 3))
+                end
+                bolt(prev, target)
+                prev = target
+            end
+        end
+        local flash = Instance.new("Part")
+        flash.Anchored = true
+        flash.CanCollide = false
+        flash.CanQuery = false
+        flash.Transparency = 1
+        flash.Size = Vector3.new(1, 1, 1)
+        flash.Position = pos
+        local light = Instance.new("PointLight")
+        light.Color = Color3.fromRGB(140, 235, 255)
+        light.Brightness = 8
+        light.Range = 25
+        light.Parent = flash
+        flash.Parent = Workspace
+        Debris:AddItem(flash, 0.3)
+    end
+
+    effects[2] = function(char, pos) -- Explosion (chỉ hiệu ứng)
+        local explosion = Instance.new("Explosion")
+        explosion.Position = pos
+        explosion.BlastRadius = 6
+        explosion.BlastPressure = 0
+        explosion.DestroyJointRadiusPercent = 0
+        explosion.ExplosionType = Enum.ExplosionType.NoCraters
+        explosion.Parent = Workspace
+    end
+
+    effects[3] = function(char) -- Freeze
+        for _, d in ipairs(char:GetDescendants()) do
+            if d:IsA("BasePart") then
+                d.Material = Enum.Material.Ice
+                d.Color = Color3.fromRGB(170, 225, 255)
+            elseif d:IsA("Decal") then
+                d.Transparency = 1
+            end
+        end
+    end
+
+    effects[4] = function(char) -- Disintegrate
+        local info = TweenInfo.new(1.2)
+        for _, d in ipairs(char:GetDescendants()) do
+            if d:IsA("BasePart") then
+                TweenService:Create(d, info, {Transparency = 1, Color = Color3.new(0, 0, 0)}):Play()
+            elseif d:IsA("Decal") then
+                TweenService:Create(d, info, {Transparency = 1}):Play()
+            end
+        end
+    end
+
+    effects[5] = function(char, pos) -- Confetti
+        local anchor = Instance.new("Part")
+        anchor.Anchored = true
+        anchor.CanCollide = false
+        anchor.CanQuery = false
+        anchor.Transparency = 1
+        anchor.Size = Vector3.new(1, 1, 1)
+        anchor.Position = pos + Vector3.new(0, 2, 0)
+
+        local emitter = Instance.new("ParticleEmitter")
+        emitter.Rate = 0
+        emitter.Lifetime = NumberRange.new(1.2, 2)
+        emitter.Speed = NumberRange.new(20, 40)
+        emitter.SpreadAngle = Vector2.new(180, 180)
+        emitter.Size = NumberSequence.new(0.5)
+        emitter.Acceleration = Vector3.new(0, -30, 0)
+        emitter.LightEmission = 0.4
+        emitter.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
+            ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 220, 80)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(90, 255, 120)),
+            ColorSequenceKeypoint.new(0.75, Color3.fromRGB(90, 160, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 120, 220)),
+        })
+        emitter.Parent = anchor
+        anchor.Parent = Workspace
+        emitter:Emit(90)
+        Debris:AddItem(anchor, 3)
+    end
+
+    local function runFinisher(index, char, pos)
+        local effect = effects[index] or effects[1]
+        pcall(effect, char, pos)
+    end
+
+    -- ---------- Phát hiện địch chết ----------
+    local function onEnemyDied(player, char)
+        if khangUnloaded or not Features.CustomFinisher or not isEnemy(player) then return end
+
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local myRoot = getRoot()
+        if not root or not myRoot then return end
+        if (root.Position - myRoot.Position).Magnitude > Features.FinisherRange then return end
+
+        if Features.FinisherOnScreen then
+            local _, onScreen = Camera:WorldToViewportPoint(root.Position)
+            if not onScreen then return end
+        end
+
+        runFinisher(Features.FinisherType, char, root.Position)
+
+        if Features.FinisherEmote then
+            Features.EmotePlay = true
+            Custom.onEmoteToggle(true)
+            notifyEmoteState()
+        end
+    end
+
+    local hooked = setmetatable({}, {__mode = "k"})
+    local function hookCharacter(player, char)
+        local hum = char:WaitForChild("Humanoid", 5)
+        if not hum or hooked[hum] then return end
+        hooked[hum] = true
+        hum.Died:Connect(function()
+            onEnemyDied(player, char)
+        end)
+    end
+
+    local function hookPlayer(player)
+        if player == LocalPlayer then return end
+        if player.Character then
+            task.spawn(hookCharacter, player, player.Character)
+        end
+        player.CharacterAdded:Connect(function(char)
+            hookCharacter(player, char)
+        end)
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do hookPlayer(player) end
+    Players.PlayerAdded:Connect(hookPlayer)
+
+    -- Xem thử hiệu ứng trên một bản sao đứng trước mặt
+    function Custom.testFinisher()
+        local char = LocalPlayer.Character
+        local root = getRoot()
+        if not char or not root then return end
+
+        local wasArchivable = char.Archivable
+        char.Archivable = true
+        local dummy = char:Clone()
+        char.Archivable = wasArchivable
+        if not dummy then return end
+
+        for _, d in ipairs(dummy:GetDescendants()) do
+            if d:IsA("BaseScript") then
+                d:Destroy()
+            elseif d:IsA("BasePart") then
+                d.Anchored = true
+                d.CanCollide = false
+            end
+        end
+        local dummyHum = dummy:FindFirstChildOfClass("Humanoid")
+        if dummyHum then dummyHum:Destroy() end
+
+        dummy:PivotTo(root.CFrame * CFrame.new(0, 0, -15))
+        dummy.Parent = Workspace
+        Debris:AddItem(dummy, 3.5)
+
+        local dummyRoot = dummy:FindFirstChild("HumanoidRootPart")
+        runFinisher(Features.FinisherType, dummy, dummyRoot and dummyRoot.Position or root.Position)
+    end
+end
+
+-- ===== SKIN PACKS (lưu / áp dụng / chia sẻ loadout skin) =====
+-- Pack dựng sẵn: thêm tại đây. Dùng nút "Dump Cosmetic Names" để lấy đúng tên skin/charm/wrap.
+-- Mẫu:
+-- BUILTIN_PACKS["Tên Pack"] = {
+--     ["Tên vũ khí"] = {Skin = {name = "Tên skin"}, Charm = {name = "Tên charm"}, Wrap = {name = "Tên wrap"}},
+-- }
+local BUILTIN_PACKS = {}
+
+Custom.packOptions = {{name = "(no packs)", placeholder = true}}
+
+do
+    local HttpService = game:GetService("HttpService")
+    local PACK_FILE = "KhangHub/skinpacks.json"
+    local PACK_PREFIX = "KHANGPACK1:"
+    local packs = {}
+
+    local function notify(text, duration)
+        showNotification("Skin Packs", text, duration or 4)
+    end
+
+    local function trim(text)
+        return (tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+    end
+
+    local function ensureFolder()
+        if makefolder and isfolder and not isfolder("KhangHub") then pcall(makefolder, "KhangHub") end
+    end
+
+    local function loadPacks()
+        packs = {}
+        if readfile and isfile and isfile(PACK_FILE) then
+            local ok, data = pcall(function() return HttpService:JSONDecode(readfile(PACK_FILE)) end)
+            if ok and type(data) == "table" then packs = data end
+        end
+    end
+
+    local function savePacks()
+        if not writefile then return false end
+        ensureFolder()
+        return (pcall(function() writefile(PACK_FILE, HttpService:JSONEncode(packs)) end))
+    end
+
+    local function getPack(name)
+        return packs[name] or BUILTIN_PACKS[name]
+    end
+
+    function Custom.selectedPackName()
+        local option = Custom.packOptions[Features.SkinPackIndex]
+        if option and not option.placeholder then return option.name end
+        return nil
+    end
+
+    function Custom.refreshPackOptions()
+        local set = {}
+        for name in pairs(BUILTIN_PACKS) do set[name] = true end
+        for name in pairs(packs) do set[name] = true end
+        local names = {}
+        for name in pairs(set) do table.insert(names, name) end
+        table.sort(names)
+
+        for i = #Custom.packOptions, 1, -1 do table.remove(Custom.packOptions, i) end
+        if #names == 0 then
+            table.insert(Custom.packOptions, {name = "(no packs)", placeholder = true})
+        else
+            for _, name in ipairs(names) do table.insert(Custom.packOptions, {name = name}) end
+        end
+
+        local index = 1
+        for i, option in ipairs(Custom.packOptions) do
+            if option.name == Features.SkinPackSelected then index = i break end
+        end
+        Features.SkinPackIndex = index
+        local option = Custom.packOptions[index]
+        if option and not option.placeholder then Features.SkinPackSelected = option.name end
+
+        if Custom.syncUI then Custom.syncUI() end
+    end
+
+    function Custom.onPackIndex(index)
+        local option = Custom.packOptions[index]
+        if option and not option.placeholder then Features.SkinPackSelected = option.name end
+    end
+
+    function Custom.nextPack()
+        local index = (Features.SkinPackIndex % #Custom.packOptions) + 1
+        Features.SkinPackIndex = index
+        Custom.onPackIndex(index)
+        return Custom.packOptions[index].name
+    end
+
+    function Custom.savePack()
+        if not Custom.skinGetEquipped then notify("Skin Changer chưa sẵn sàng, đợi vài giây") return end
+        local data = Custom.skinGetEquipped()
+        if next(data) == nil then notify("Chưa trang bị skin nào để lưu") return end
+
+        local name = trim(Features.SkinPackName)
+        if name == "" then
+            local count = 0
+            for _ in pairs(packs) do count += 1 end
+            name = "Pack " .. (count + 1)
+        end
+        if BUILTIN_PACKS[name] then name = name .. " (user)" end
+
+        packs[name] = data
+        local saved = savePacks()
+        Features.SkinPackSelected = name
+        Custom.refreshPackOptions()
+        notify(saved and ("Đã lưu pack '" .. name .. "'") or ("Đã lưu pack '" .. name .. "' (chỉ trong phiên này, thiếu writefile)"), 5)
+    end
+
+    function Custom.applyPack(silent)
+        local name = Custom.selectedPackName()
+        local pack = name and getPack(name)
+        if not pack then
+            if not silent then notify("Chưa chọn pack nào") end
+            return false
+        end
+        if not Custom.skinApply then
+            if not silent then notify("Skin Changer chưa sẵn sàng, đợi vài giây") end
+            return false
+        end
+        if not Features.SkinChanger then
+            if not silent then notify("Hãy bật Skin Changer trước") end
+            return false
+        end
+        local applied, missing = Custom.skinApply(pack)
+        notify(string.format("Đã áp dụng '%s': %d mục, thiếu %d", name, applied, missing), 5)
+        return true
+    end
+
+    function Custom.deletePack()
+        local name = Custom.selectedPackName()
+        if not name then notify("Chưa chọn pack nào") return end
+        if not packs[name] then notify("Pack dựng sẵn không xóa được") return end
+        packs[name] = nil
+        savePacks()
+        Custom.refreshPackOptions()
+        notify("Đã xóa pack '" .. name .. "'")
+    end
+
+    function Custom.exportPack()
+        local name = Custom.selectedPackName()
+        local pack = name and getPack(name)
+        if not pack then notify("Chưa chọn pack nào") return end
+
+        local payload = PACK_PREFIX .. HttpService:JSONEncode({name = name, data = pack})
+        local clip = setclipboard or toclipboard
+        if clip and pcall(clip, payload) then
+            notify("Đã copy pack '" .. name .. "' vào clipboard", 5)
+            return
+        end
+
+        if writefile then
+            ensureFolder()
+            local fileName = "KhangHub/export_" .. name:gsub("[^%w_%-]", "_") .. ".txt"
+            if pcall(function() writefile(fileName, payload) end) then
+                notify("Executor không có clipboard, đã ghi file: " .. fileName, 6)
+                return
+            end
+        end
+        notify("Không xuất được pack (thiếu clipboard/writefile)", 5)
+    end
+
+    function Custom.importPackString(text)
+        text = trim(text)
+        if text:sub(1, #PACK_PREFIX) ~= PACK_PREFIX then
+            notify("Chuỗi pack không hợp lệ (phải bắt đầu bằng KHANGPACK1:)", 5)
+            return false
+        end
+        local ok, decoded = pcall(function() return HttpService:JSONDecode(text:sub(#PACK_PREFIX + 1)) end)
+        if not ok or type(decoded) ~= "table" or type(decoded.data) ~= "table" then
+            notify("Không đọc được nội dung pack", 5)
+            return false
+        end
+
+        local name = trim(decoded.name)
+        if name == "" then name = "Imported" end
+        if BUILTIN_PACKS[name] then name = name .. " (user)" end
+        packs[name] = decoded.data
+        savePacks()
+        Features.SkinPackSelected = name
+        Custom.refreshPackOptions()
+        notify("Đã nhập pack '" .. name .. "'", 5)
+        return true
+    end
+
+    function Custom.importPackFromTextbox()
+        Custom.importPackString(Features.SkinPackImport)
+    end
+
+    function Custom.importPackFromFile()
+        local path = "KhangHub/import.txt"
+        if not (readfile and isfile and isfile(path)) then
+            notify("Không thấy file " .. path .. " (dán chuỗi pack vào file đó rồi bấm lại)", 6)
+            return
+        end
+        Custom.importPackString(readfile(path))
+    end
+
+    function Custom.dumpCosmetics()
+        if not Custom.skinDump then notify("Skin Changer chưa sẵn sàng, đợi vài giây") return end
+        local count = Custom.skinDump()
+        notify("Đã ghi " .. count .. " cosmetic vào KhangHub/cosmetics.txt", 6)
+    end
+
+    loadPacks()
+    Custom.refreshPackOptions()
+
+    -- Tự áp dụng pack đã chọn khi vào game (nếu bật)
+    task.spawn(function()
+        for _ = 1, 60 do
+            if Custom.skinApply or khangUnloaded then break end
+            task.wait(0.5)
+        end
+        task.wait(1)
+        if not khangUnloaded and Features.SkinPackAuto and Features.SkinChanger then
+            Custom.applyPack(true)
+        end
+    end)
+end
+
 -- ===== CLICKGUI: panel nhiều cột (RightShift để ẩn/hiện) =====
 do
     local COLORS = {
@@ -2887,6 +3691,15 @@ do
     end
 
     local onChange = {
+        EmotePlay = function(state)
+            Custom.onEmoteToggle(state)
+        end,
+        AutoExec = function(state)
+            Custom.onAutoExec(state)
+        end,
+        SkinPackIndex = function(index)
+            Custom.onPackIndex(index)
+        end,
         PanelStyle = function()
             menuOpen = true
             updateMenus()
@@ -3128,6 +3941,51 @@ do
         visual()
     end
 
+    local function createTextBox(parent, st, order)
+        local Row = new("Frame", {
+            Size = UDim2.new(1, 0, 0, 26),
+            BackgroundTransparency = 1,
+            LayoutOrder = order,
+        }, parent)
+
+        new("TextLabel", {
+            Size = UDim2.new(0.45, -8, 1, 0),
+            Position = UDim2.new(0, 8, 0, 0),
+            BackgroundTransparency = 1,
+            Text = st.name,
+            TextColor3 = COLORS.text,
+            TextSize = 12,
+            Font = Enum.Font.Gotham,
+            TextXAlignment = Enum.TextXAlignment.Left,
+        }, Row)
+
+        local Box = new("TextBox", {
+            Size = UDim2.new(0.55, -12, 0, 20),
+            Position = UDim2.new(0.45, 0, 0.5, -10),
+            BackgroundColor3 = COLORS.off,
+            BorderSizePixel = 0,
+            Text = "",
+            PlaceholderText = st.placeholder or "",
+            PlaceholderColor3 = COLORS.sub,
+            TextColor3 = COLORS.text,
+            TextSize = 12,
+            Font = Enum.Font.Gotham,
+            ClearTextOnFocus = false,
+        }, Row)
+        new("UICorner", {CornerRadius = UDim.new(0, 4)}, Box)
+
+        local function visual()
+            Box.Text = tostring(Features[st.key] or "")
+        end
+
+        Box.FocusLost:Connect(function()
+            setFeature(st.key, Box.Text)
+        end)
+
+        addRefresher(st.key, visual)
+        visual()
+    end
+
     local function createButtonSetting(parent, st, order)
         local Btn = new("TextButton", {
             Size = UDim2.new(1, 0, 0, 24),
@@ -3228,6 +4086,8 @@ do
                     createCycle(Settings, st, index)
                 elseif st.type == "button" then
                     createButtonSetting(Settings, st, index)
+                elseif st.type == "textbox" then
+                    createTextBox(Settings, st, index)
                 else
                     createToggleSetting(Settings, st, index)
                 end
@@ -3261,43 +4121,6 @@ do
             Btn.MouseButton2Click:Connect(toggleSettings)
             if not mod.key then Btn.MouseButton1Click:Connect(toggleSettings) end
         end
-    end
-
-    -- ---------- Xóa script (unload + xóa file đã lưu) ----------
-    local deleteArmed = false
-    local function deleteScriptAction(btn)
-        if not deleteArmed then
-            deleteArmed = true
-            btn.Text = "Click again to confirm"
-            task.delay(3, function()
-                deleteArmed = false
-                if btn and btn.Parent then btn.Text = "Delete Script" end
-            end)
-            return
-        end
-        deleteArmed = false
-
-        task.spawn(function()
-            unloadHub()
-            task.wait(0.8) -- chờ lần lưu cấu hình dở dang (nếu có) xong rồi mới xóa
-
-            pcall(function()
-                if delfile and isfile and isfile(UI_FILE) then delfile(UI_FILE) end
-            end)
-            pcall(function()
-                if delfolder and isfolder and isfolder("Rivals-Skinchanger") then delfolder("Rivals-Skinchanger") end
-            end)
-            pcall(function()
-                if listfiles and delfile then
-                    for _, path in ipairs(listfiles("")) do
-                        local name = string.match(path, "([^/\\]+)$") or path
-                        if string.match(name, "^tex_%d+_%d+%.asset$") then
-                            pcall(delfile, path)
-                        end
-                    end
-                end
-            end)
-        end)
     end
 
     -- ---------- Danh sách module ----------
@@ -3335,7 +4158,22 @@ do
             {name = "Third Person", key = "ThirdPerson", settings = {
                 {type = "slider", name = "Distance", key = "TPDistance", min = 2, max = 50},
             }},
-            {name = "Skin Changer", key = "SkinChanger"},
+            {name = "Skin Changer", key = "SkinChanger", settings = {
+                {type = "toggle", name = "Debug Log (F9)", key = "SkinDebug"},
+            }},
+            {name = "Skin Packs", settings = {
+                {type = "cycle", name = "Pack", key = "SkinPackIndex", options = Custom.packOptions},
+                {type = "button", name = "Apply Pack", action = function() Custom.applyPack() end},
+                {type = "textbox", name = "New Pack Name", key = "SkinPackName", placeholder = "My Pack"},
+                {type = "button", name = "Save Current As Pack", action = function() Custom.savePack() end},
+                {type = "button", name = "Export Pack (copy)", action = function() Custom.exportPack() end},
+                {type = "textbox", name = "Import String", key = "SkinPackImport", placeholder = "KHANGPACK1:..."},
+                {type = "button", name = "Import Pack", action = function() Custom.importPackFromTextbox() end},
+                {type = "button", name = "Import From File", action = function() Custom.importPackFromFile() end},
+                {type = "button", name = "Delete Pack", action = function() Custom.deletePack() end},
+                {type = "toggle", name = "Auto Apply On Start", key = "SkinPackAuto"},
+                {type = "button", name = "Dump Cosmetic Names", action = function() Custom.dumpCosmetics() end},
+            }},
             {name = "Texture Pack", key = "TexturePack"},
             {name = "Map Darkener", key = "MapDarkener", settings = {
                 {type = "slider", name = "Darkness", key = "Darkness", min = 1, max = 10},
@@ -3376,8 +4214,33 @@ do
             {name = "Anti AFK", key = "AntiAFK"},
             {name = "FPS Boost", key = "FPSBoost"},
             {name = "Show FPS", key = "ShowFPS"},
+            {name = "Custom Emote", key = "EmotePlay", settings = {
+                {type = "cycle", name = "Emote", key = "EmoteIndex", options = Custom.EMOTES},
+                {type = "textbox", name = "Custom Anim ID", key = "EmoteCustomId", placeholder = "Animation ID"},
+                {type = "toggle", name = "Loop", key = "EmoteLoop"},
+                {type = "toggle", name = "Stop On Move", key = "EmoteStopMove"},
+                {type = "slider", name = "Speed %", key = "EmoteSpeed", min = 10, max = 300},
+            }},
+            {name = "Custom Finisher", key = "CustomFinisher", settings = {
+                {type = "cycle", name = "Effect", key = "FinisherType", options = Custom.FINISHERS},
+                {type = "slider", name = "Range", key = "FinisherRange", min = 20, max = 300},
+                {type = "toggle", name = "Only In View", key = "FinisherOnScreen"},
+                {type = "toggle", name = "Kill Emote", key = "FinisherEmote"},
+                {type = "button", name = "Test Effect", action = function() Custom.testFinisher() end},
+            }},
         }},
         {name = "Other", modules = {
+            {name = "Config", settings = {
+                {type = "toggle", name = "Auto Save", key = "ConfigAutoSave"},
+                {type = "toggle", name = "Load On Start", key = "ConfigAutoLoad"},
+                {type = "button", name = "Save Now", action = function() Custom.saveNow() end},
+                {type = "button", name = "Load Now", action = function() Custom.loadConfig() end},
+                {type = "button", name = "Delete Saved Config", action = function() Custom.deleteConfig() end},
+            }},
+            {name = "Auto Execute", key = "AutoExec", settings = {
+                {type = "textbox", name = "File / URL", key = "AutoExecSource", placeholder = "khang_hub.lua"},
+                {type = "button", name = "Install Autoexec File", action = function() Custom.installAutoexecFile() end},
+            }},
             {name = "Interface", settings = {
                 {type = "cycle", name = "Panel Style", key = "PanelStyle", options = PANEL_STYLES},
                 {type = "cycle", name = "Theme", key = "ThemeIndex", options = THEMES},
@@ -3393,7 +4256,6 @@ do
             }},
             {name = "Execute MC Texture", action = function(btn) runMcTexture(btn) end},
             {name = "Unload Khang Hub", color = Color3.fromRGB(255, 120, 120), action = function() unloadHub() end},
-            {name = "Delete Script", color = Color3.fromRGB(255, 70, 70), action = function(btn) deleteScriptAction(btn) end},
         }},
     }
 
@@ -3455,11 +4317,37 @@ do
     relayout()
     updateMenus()
 
+    Custom.emoteStateChanged = function()
+        refresh("EmotePlay")
+        for _, fn in ipairs(LegacySync) do pcall(fn) end
+    end
+
+    -- Đồng bộ lại cả hai kiểu menu sau khi nạp cấu hình
+    Custom.syncUI = function()
+        for _, fn in ipairs(LegacySync) do pcall(fn) end
+        for key in pairs(refreshers) do refresh(key) end
+    end
+
+    -- Lưu / nạp phím tắt (Bind) của từng module
+    Custom.getBinds = function()
+        local result = {}
+        for _, mod in ipairs(allModules) do
+            if mod.bind then result[mod.name] = mod.bind.Name end
+        end
+        return result
+    end
+    Custom.setBinds = function(saved)
+        for _, mod in ipairs(allModules) do
+            local keyName = saved[mod.name]
+            if keyName and Enum.KeyCode[keyName] then
+                mod.bind = Enum.KeyCode[keyName]
+                if mod.bindButton then mod.bindButton.Text = "Bind: " .. keyName end
+            end
+        end
+    end
+
     setPanelStyle = function(index)
         setFeature("PanelStyle", index)
-    end
-    runDeleteScript = function(btn)
-        deleteScriptAction(btn)
     end
     cycleSkyPreset = function()
         local nextIndex = (Features.SkyPreset % #SKY_PRESETS) + 1
@@ -3502,4 +4390,183 @@ do
             end
         end
     end)
+end
+
+-- ===== CONFIG (lưu / nhớ cài đặt) + AUTO EXECUTE =====
+do
+    local HttpService = game:GetService("HttpService")
+    local CONFIG_DIR, CONFIG_FILE = "KhangHub", "KhangHub/config.json"
+    -- Các key giao diện đã có file riêng (KhangHub_ui.json); EmotePlay chỉ là trạng thái tạm
+    local SKIP = {
+        ThemeIndex = true, BgIndex = true, PanelScale = true, PanelTransparency = true,
+        PanelCorner = true, PanelStyle = true, EmotePlay = true,
+        SkinPackIndex = true, SkinPackName = true, SkinPackImport = true,
+    }
+    local lastSaved = nil
+
+    local function snapshot()
+        local features = {}
+        for key, value in pairs(Features) do
+            local t = type(value)
+            if not SKIP[key] and (t == "boolean" or t == "number" or t == "string") then
+                features[key] = value
+            end
+        end
+        local binds = Custom.getBinds and Custom.getBinds() or {}
+        return {version = 1, features = features, binds = binds}
+    end
+
+    local function encodeSnapshot()
+        local ok, encoded = pcall(function() return HttpService:JSONEncode(snapshot()) end)
+        return ok and encoded or nil
+    end
+
+    local function readConfig()
+        if not (readfile and isfile and isfile(CONFIG_FILE)) then return nil end
+        local ok, data = pcall(function() return HttpService:JSONDecode(readfile(CONFIG_FILE)) end)
+        if ok and type(data) == "table" then return data end
+        return nil
+    end
+
+    -- ---------- Lưu ----------
+    function Custom.saveConfig(force)
+        if not writefile then return false end
+        local encoded = encodeSnapshot()
+        if not encoded then return false end
+        if not force and encoded == lastSaved then return true end
+        local wrote = pcall(function()
+            if makefolder and isfolder and not isfolder(CONFIG_DIR) then makefolder(CONFIG_DIR) end
+            writefile(CONFIG_FILE, encoded)
+        end)
+        if wrote then lastSaved = encoded end
+        return wrote
+    end
+
+    function Custom.saveNow()
+        local ok = Custom.saveConfig(true)
+        showNotification("Config", ok and "Đã lưu cấu hình" or "Không lưu được (thiếu writefile?)", 4)
+    end
+
+    -- ---------- Nạp ----------
+    function Custom.loadConfig()
+        local data = readConfig()
+        if not data or type(data.features) ~= "table" then
+            showNotification("Config", "Chưa có cấu hình đã lưu", 4)
+            return false
+        end
+
+        for key, value in pairs(data.features) do
+            if not SKIP[key] and Features[key] ~= nil and type(Features[key]) == type(value) then
+                Features[key] = value
+            end
+        end
+        if type(data.binds) == "table" and Custom.setBinds then
+            Custom.setBinds(data.binds)
+        end
+
+        -- Các tính năng cần hàm khởi động / dọn dẹp riêng
+        if Features.Darkness then pcall(setDarkness, Features.Darkness) end
+        pcall(Features.FPSBoost and enableBoost or disableBoost)
+        pcall(Features.TexturePack and enableTexturePack or disableTexturePack)
+        pcall(Features.MapDarkener and enableDarkener or disableDarkener)
+        pcall(Features.SkyChanger and enableSky or disableSky)
+
+        if Custom.refreshPackOptions then Custom.refreshPackOptions() end
+        if Custom.syncUI then Custom.syncUI() end
+        lastSaved = encodeSnapshot()
+        return true
+    end
+
+    function Custom.deleteConfig()
+        pcall(function()
+            if delfile and isfile and isfile(CONFIG_FILE) then delfile(CONFIG_FILE) end
+        end)
+        lastSaved = encodeSnapshot()
+        showNotification("Config", "Đã xóa cấu hình đã lưu", 4)
+    end
+
+    -- ---------- Auto Execute ----------
+    local function buildLoader()
+        local source = tostring(Features.AutoExecSource or "")
+        if source == "" then source = "khang_hub.lua" end
+        local isUrl = source:lower():match("^https?://") ~= nil
+        local loadLine = isUrl
+            and string.format("loadstring(game:HttpGet(%q))()", source)
+            or string.format("loadstring(readfile(%q))()", source)
+
+        if writefile and readfile then
+            -- Chỉ chạy nếu cấu hình đã lưu còn bật Auto Execute (tắt nút là loader tự bỏ qua)
+            return table.concat({
+                'local ok, cfg = pcall(function()',
+                '    return game:GetService("HttpService"):JSONDecode(readfile("KhangHub/config.json"))',
+                'end)',
+                'if ok and cfg and cfg.features and cfg.features.AutoExec then',
+                '    ' .. loadLine,
+                'end',
+            }, "\n")
+        end
+        return loadLine
+    end
+
+    function Custom.queueAutoExec(silent)
+        local queue = queue_on_teleport or queueonteleport
+            or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+        if not queue then
+            if not silent then
+                showNotification("Auto Execute", "Executor không hỗ trợ queue_on_teleport", 5)
+            end
+            return false
+        end
+        local ok = pcall(queue, buildLoader())
+        if not silent then
+            showNotification("Auto Execute", ok and "Đã bật: script chạy lại khi đổi server" or "Không queue được", 5)
+        end
+        return ok
+    end
+
+    function Custom.onAutoExec(state)
+        Custom.saveConfig(true) -- loader đọc cờ AutoExec từ file cấu hình
+        if state then Custom.queueAutoExec() end
+    end
+
+    function Custom.installAutoexecFile()
+        if not writefile then
+            showNotification("Auto Execute", "Executor thiếu writefile", 5)
+            return
+        end
+        Custom.saveConfig(true)
+        local loader = buildLoader()
+        local written
+        for _, path in ipairs({"autoexec/KhangHub.lua", "../autoexec/KhangHub.lua"}) do
+            local ok = pcall(function() writefile(path, loader) end)
+            if ok and (not isfile or isfile(path)) then
+                written = path
+                break
+            end
+        end
+        showNotification("Auto Execute",
+            written and ("Đã ghi loader: " .. written) or "Không ghi được vào autoexec",
+            6)
+    end
+
+    -- ---------- Khởi động: nạp cấu hình, bật lại auto execute, tự lưu ----------
+    local startData = readConfig()
+    if startData and type(startData.features) == "table" and startData.features.ConfigAutoLoad ~= false then
+        pcall(Custom.loadConfig)
+    end
+    lastSaved = encodeSnapshot()
+    if Features.AutoExec then Custom.queueAutoExec(true) end
+
+    task.spawn(function()
+        while not khangUnloaded do
+            task.wait(3)
+            if Features.ConfigAutoSave and not khangUnloaded then
+                Custom.saveConfig(false)
+            end
+        end
+    end)
+
+    -- Chạy lại script (hoặc autoexec chạy trùng) sẽ tự gỡ bản cũ
+    local env = (getgenv and getgenv()) or _G
+    env.KhangHubUnload = function() unloadHub() end
 end
