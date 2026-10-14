@@ -269,8 +269,37 @@ local Features = {
     Chams = false,
     Fullbright = false,
     FOVChanger = false,
-    CameraFOV = 90
+    CameraFOV = 90,
+    FPSBoost = false,
+    ShowFPS = false,
+    ThirdPerson = false,
+    TPDistance = 12,
+    TexturePack = false,
+    MapDarkener = false,
+    TargetStrafe = false,
+    StrafeRange = 1000,
+    StrafeRadius = 10,
+    StrafeSpeed = 5,
+    StrafeY = 0,
+    StrafeFace = true,
+    AntiAim = false,
+    AntiAimMode = 1,
+    AntiAimSpeed = 50,
+    SkyChanger = false,
+    SkyPreset = 1,
+    SkyTime = 18,
+    SkyStars = 0,
+    SkyDensity = 35,
+    SkyRainbow = false,
+    PanelStyle = 1
 }
+
+-- Khai báo trước để nút trong menu gọi được
+local enableBoost, disableBoost
+local enableTexturePack, disableTexturePack, enableDarkener, disableDarkener, setDarkness, runMcTexture, unloadHub
+local enableSky, disableSky, setPanelStyle, runDeleteScript, cycleSkyPreset
+local khangUnloaded = false
+local ANTIAIM_MODES = {{name = "Spin"}, {name = "Jitter"}, {name = "Backwards"}, {name = "Random"}}
 
 -- Keybinds storage
 local Keybinds = {
@@ -743,6 +772,9 @@ UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     ContentFrame.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y + 20)
 end)
 
+-- Danh sách hàm đồng bộ giao diện Classic với Features
+local LegacySync = {}
+
 -- Función para crear Toggle con Keybind
 local function CreateToggle(text, featureKey, default, onChange)
     local Frame = Instance.new("Frame")
@@ -799,7 +831,7 @@ local function CreateToggle(text, featureKey, default, onChange)
     end
     
     local function toggleState()
-        state = not state
+        state = not (Features[featureKey] and true or false)
         if Features[featureKey] ~= nil then
             Features[featureKey] = state
         end
@@ -820,6 +852,12 @@ local function CreateToggle(text, featureKey, default, onChange)
     end
     
     ToggleBtn.MouseButton1Click:Connect(toggleState)
+
+    table.insert(LegacySync, function()
+        state = Features[featureKey] and true or false
+        ToggleBtn.Text = state and "ON" or "OFF"
+        ToggleBtn.BackgroundColor3 = state and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+    end)
     
     KeybindBtn.MouseButton1Click:Connect(function()
         if listeningForKey then return end
@@ -864,7 +902,7 @@ local function CreateToggle(text, featureKey, default, onChange)
 end
 
 -- Función para crear Slider
-local function CreateSlider(text, min, max, default, callback)
+local function CreateSlider(text, min, max, default, callback, featureKey)
     local Frame = Instance.new("Frame")
     Frame.Size = UDim2.new(1, 0, 0, 60)
     Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
@@ -934,7 +972,54 @@ local function CreateSlider(text, min, max, default, callback)
         end
     end)
     
+    if featureKey then
+        table.insert(LegacySync, function()
+            local value = Features[featureKey] or default
+            SliderFill.Size = UDim2.new(math.clamp((value - min) / (max - min), 0, 1), 0, 1, 0)
+            Label.Text = text .. ": " .. value
+        end)
+    end
+
     Frame.Parent = ContentFrame
+end
+
+-- Nút bấm thường
+local function CreateButton(text, callback, color)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(1, 0, 0, 38)
+    Btn.BackgroundColor3 = color or Color3.fromRGB(35, 35, 40)
+    Btn.BorderSizePixel = 0
+    Btn.Text = text
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.TextSize = 13
+    Btn.Font = Enum.Font.GothamSemibold
+
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 8)
+    BtnCorner.Parent = Btn
+
+    Btn.MouseButton1Click:Connect(function()
+        callback(Btn)
+    end)
+
+    Btn.Parent = ContentFrame
+    return Btn
+end
+
+-- Ghi chú nhiều dòng
+local function CreateNote(text, height)
+    local Note = Instance.new("TextLabel")
+    Note.Size = UDim2.new(1, 0, 0, height or 60)
+    Note.BackgroundTransparency = 1
+    Note.Text = text
+    Note.TextColor3 = Color3.fromRGB(240, 180, 80)
+    Note.TextSize = 11
+    Note.Font = Enum.Font.Gotham
+    Note.TextWrapped = true
+    Note.TextXAlignment = Enum.TextXAlignment.Left
+    Note.TextYAlignment = Enum.TextYAlignment.Top
+    Note.Parent = ContentFrame
+    return Note
 end
 
 -- Sección: AIMBOT
@@ -952,11 +1037,11 @@ CreateToggle("Team Check", "TeamCheck", true)
 
 CreateSlider("FOV", 50, 500, 150, function(value)
     Features.FOV = value
-end)
+end, "FOV")
 
 CreateSlider("Aim Offset", -10, 10, 0, function(value)
     Features.AimOffset = value
-end)
+end, "AimOffset")
 
 CreateToggle("Aimbot", "Aimbot", false)
 CreateToggle("Hold RMB", "HoldRMB", true)
@@ -964,17 +1049,17 @@ CreateToggle("Wall Check", "WallCheck", true)
 
 CreateSlider("Aimbot FOV", 30, 500, 120, function(value)
     Features.AimbotFOV = value
-end)
+end, "AimbotFOV")
 
 CreateSlider("Smoothness", 1, 100, 20, function(value)
     Features.AimbotSmooth = value
-end)
+end, "AimbotSmooth")
 
 CreateToggle("Trigger Bot", "TriggerBot", false)
 
 CreateSlider("Trigger Delay (ms)", 0, 300, 0, function(value)
     Features.TriggerDelay = value
-end)
+end, "TriggerDelay")
 
 -- Sección: ESP
 local ESPSection = Instance.new("TextLabel")
@@ -994,7 +1079,7 @@ CreateToggle("Info Text", "ShowInfo", true)
 
 CreateSlider("Max Distance", 100, 2000, 1000, function(value)
     Features.MaxDistance = value
-end)
+end, "MaxDistance")
 
 -- Sección: SKINS
 local SkinSection = Instance.new("TextLabel")
@@ -1029,19 +1114,19 @@ PlayerSection.Parent = ContentFrame
 CreateToggle("Speed Hack", "Speed", false)
 CreateSlider("Walk Speed", 16, 200, 50, function(value)
     Features.SpeedValue = value
-end)
+end, "SpeedValue")
 
 CreateToggle("Jump Power", "JumpHack", false)
 CreateSlider("Jump Value", 50, 300, 100, function(value)
     Features.JumpValue = value
-end)
+end, "JumpValue")
 
 CreateToggle("Infinite Jump", "InfJump", false)
 CreateToggle("Noclip", "Noclip", false)
 CreateToggle("Fly (WASD/Space/Ctrl)", "Fly", false)
 CreateSlider("Fly Speed", 10, 200, 60, function(value)
     Features.FlySpeed = value
-end)
+end, "FlySpeed")
 CreateToggle("Anti AFK", "AntiAFK", false)
 
 -- Sección: VISUAL
@@ -1059,7 +1144,149 @@ CreateToggle("Fullbright", "Fullbright", false)
 CreateToggle("Camera FOV", "FOVChanger", false)
 CreateSlider("FOV Value", 40, 120, 90, function(value)
     Features.CameraFOV = value
+end, "CameraFOV")
+CreateToggle("Third Person", "ThirdPerson", false)
+CreateSlider("TP Distance", 2, 50, 12, function(value)
+    Features.TPDistance = value
+end, "TPDistance")
+
+-- Sección: TARGET STRAFE / ANTI AIM / SKY (menu Classic)
+local function CreateSection(text)
+    local SectionLabel = Instance.new("TextLabel")
+    SectionLabel.Size = UDim2.new(1, 0, 0, 30)
+    SectionLabel.BackgroundTransparency = 1
+    SectionLabel.Text = text
+    SectionLabel.TextColor3 = Color3.fromRGB(0, 170, 255)
+    SectionLabel.TextSize = 14
+    SectionLabel.Font = Enum.Font.GothamBold
+    SectionLabel.Parent = ContentFrame
+end
+
+CreateSection("TARGET STRAFE")
+CreateToggle("Target Strafe", "TargetStrafe", false)
+CreateSlider("Search Range", 50, 2000, 1000, function(value)
+    Features.StrafeRange = value
+end, "StrafeRange")
+CreateSlider("Radius", 3, 30, 10, function(value)
+    Features.StrafeRadius = value
+end, "StrafeRadius")
+CreateSlider("Orbit Speed", 1, 20, 5, function(value)
+    Features.StrafeSpeed = value
+end, "StrafeSpeed")
+CreateSlider("Y Factor", -10, 10, 0, function(value)
+    Features.StrafeY = value
+end, "StrafeY")
+CreateToggle("Face Target", "StrafeFace", true)
+
+CreateSection("ANTI AIM")
+CreateToggle("Anti Aim", "AntiAim", false)
+local aaModeBtn
+aaModeBtn = CreateButton("Anti Aim Mode: " .. ANTIAIM_MODES[Features.AntiAimMode].name, function(btn)
+    Features.AntiAimMode = (Features.AntiAimMode % #ANTIAIM_MODES) + 1
+    btn.Text = "Anti Aim Mode: " .. ANTIAIM_MODES[Features.AntiAimMode].name
 end)
+table.insert(LegacySync, function()
+    aaModeBtn.Text = "Anti Aim Mode: " .. ANTIAIM_MODES[Features.AntiAimMode].name
+end)
+CreateSlider("Spin Speed", 1, 100, 50, function(value)
+    Features.AntiAimSpeed = value
+end, "AntiAimSpeed")
+
+CreateSection("SKY")
+CreateToggle("Sky Changer", "SkyChanger", false, function(state)
+    if state then enableSky() else disableSky() end
+end)
+CreateButton("Sky Preset: bấm để đổi", function(btn)
+    local name = cycleSkyPreset()
+    btn.Text = "Sky Preset: " .. name
+    for _, fn in ipairs(LegacySync) do pcall(fn) end
+end)
+CreateSlider("Time (h)", 0, 24, 18, function(value)
+    Features.SkyTime = value
+end, "SkyTime")
+CreateSlider("Stars", 0, 5000, 0, function(value)
+    Features.SkyStars = value
+end, "SkyStars")
+CreateSlider("Density %", 0, 100, 35, function(value)
+    Features.SkyDensity = value
+end, "SkyDensity")
+CreateToggle("Rainbow Sky", "SkyRainbow", false)
+
+-- Sección: PERFORMANCE
+local PerfSection = Instance.new("TextLabel")
+PerfSection.Size = UDim2.new(1, 0, 0, 30)
+PerfSection.BackgroundTransparency = 1
+PerfSection.Text = "PERFORMANCE"
+PerfSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+PerfSection.TextSize = 14
+PerfSection.Font = Enum.Font.GothamBold
+PerfSection.Parent = ContentFrame
+
+CreateToggle("FPS Boost (giảm lag)", "FPSBoost", false, function(state)
+    if state then enableBoost() else disableBoost() end
+end)
+CreateToggle("Show FPS", "ShowFPS", false)
+
+-- Sección: TEXTURES
+local TexSection = Instance.new("TextLabel")
+TexSection.Size = UDim2.new(1, 0, 0, 30)
+TexSection.BackgroundTransparency = 1
+TexSection.Text = "TEXTURES (module: n1ghtmare_delta)"
+TexSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+TexSection.TextSize = 14
+TexSection.Font = Enum.Font.GothamBold
+TexSection.Parent = ContentFrame
+
+CreateToggle("Fleasion Texture Pack", "TexturePack", false, function(state)
+    if state then enableTexturePack() else disableTexturePack() end
+end)
+
+CreateButton("Execute MC Texture", function(btn)
+    runMcTexture(btn)
+end)
+
+CreateNote("⚠️ Lần đầu bật có thể load chậm, hãy chờ một chút.\n⚠️ Tắt Texture Pack trước khi chạy MC Texture.\n⚠️ Chạy MC Texture xong thì không dùng được texture khác (Map Darkener vẫn dùng được).", 95)
+
+-- Sección: MAP DARKENER
+local DarkSection = Instance.new("TextLabel")
+DarkSection.Size = UDim2.new(1, 0, 0, 30)
+DarkSection.BackgroundTransparency = 1
+DarkSection.Text = "MAP DARKENER"
+DarkSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+DarkSection.TextSize = 14
+DarkSection.Font = Enum.Font.GothamBold
+DarkSection.Parent = ContentFrame
+
+CreateToggle("Map Darkener", "MapDarkener", false, function(state)
+    if state then enableDarkener() else disableDarkener() end
+end)
+
+CreateSlider("Darkness (1 xám → 10 đen)", 1, 10, 10, function(value)
+    Features.Darkness = value
+    setDarkness(value)
+end, "Darkness")
+
+-- Sección: SYSTEM
+local SysSection = Instance.new("TextLabel")
+SysSection.Size = UDim2.new(1, 0, 0, 30)
+SysSection.BackgroundTransparency = 1
+SysSection.Text = "SYSTEM"
+SysSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+SysSection.TextSize = 14
+SysSection.Font = Enum.Font.GothamBold
+SysSection.Parent = ContentFrame
+
+CreateButton("Switch to Click GUI", function()
+    setPanelStyle(1)
+end, Color3.fromRGB(50, 80, 170))
+
+CreateButton("❌ UNLOAD KHANG HUB", function()
+    unloadHub()
+end, Color3.fromRGB(150, 40, 40))
+
+CreateButton("Delete Script", function(btn)
+    runDeleteScript(btn)
+end, Color3.fromRGB(190, 40, 40))
 
 -- FOV Circle Visual
 local FOVCircle = Drawing.new("Circle")
@@ -1422,7 +1649,7 @@ local bodyConnections = {
 }
 
 local function createESP(player)
-    if player == LocalPlayer then return end
+    if player == LocalPlayer or khangUnloaded then return end
     
     local objects = {}
     
@@ -1594,6 +1821,7 @@ local function getRoot()
 end
 
 local savedWalkSpeed, speedActive = 16, false
+local jumpApplied = false
 local savedJump, jumpActive = 50, false
 local savedFOV, fovActive = Camera.FieldOfView, false
 local flyBV, flyBG = nil, nil
@@ -1640,27 +1868,28 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
-RunService.Heartbeat:Connect(function()
+RunService.Heartbeat:Connect(function(dt)
     local hum, root = getHumanoid(), getRoot()
 
-    -- Speed
-    if hum then
-        if Features.Speed then
-            if not speedActive then savedWalkSpeed = hum.WalkSpeed speedActive = true end
-            hum.WalkSpeed = Features.SpeedValue
-        elseif speedActive then
-            hum.WalkSpeed = savedWalkSpeed
-            speedActive = false
+    -- Speed (dùng CFrame, hoạt động kể cả khi game khóa WalkSpeed)
+    if Features.Speed and hum and root and not Features.Fly then
+        local moveDir = hum.MoveDirection
+        if moveDir.Magnitude > 0 then
+            local extra = math.max(Features.SpeedValue - 16, 0)
+            root.CFrame = root.CFrame + moveDir.Unit * extra * dt
         end
+    end
 
-        -- Jump power
-        if Features.JumpHack then
-            if not jumpActive then savedJump = hum.JumpPower jumpActive = true end
-            hum.UseJumpPower = true
-            hum.JumpPower = Features.JumpValue
-        elseif jumpActive then
-            hum.JumpPower = savedJump
-            jumpActive = false
+    -- Jump (đặt vận tốc nhảy trực tiếp, không phụ thuộc JumpPower)
+    if Features.JumpHack and hum and root then
+        if hum:GetState() == Enum.HumanoidStateType.Jumping then
+            if not jumpApplied then
+                jumpApplied = true
+                local v = root.AssemblyLinearVelocity
+                root.AssemblyLinearVelocity = Vector3.new(v.X, Features.JumpValue, v.Z)
+            end
+        else
+            jumpApplied = false
         end
     end
 
@@ -1709,7 +1938,12 @@ end)
 UserInputService.JumpRequest:Connect(function()
     if Features.InfJump then
         local hum = getHumanoid()
+        local root = getRoot()
         if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+        if root then
+            local v = root.AssemblyLinearVelocity
+            root.AssemblyLinearVelocity = Vector3.new(v.X, Features.JumpHack and Features.JumpValue or 50, v.Z)
+        end
     end
 end)
 
@@ -1760,6 +1994,1512 @@ end)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed or listeningForKey then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
-        MainFrame.Visible = not MainFrame.Visible
+        -- RightShift giờ do ClickGUI xử lý
     end
 end)
+
+-- ===== PERFORMANCE (giảm lag) =====
+local boostBackup = setmetatable({}, {__mode = "k"})
+local boostLighting, boostTerrain, boostEffects = nil, nil, {}
+local boostConn, boostQuality = nil, nil
+local boostActive, boostToken = false, 0
+
+local function boostInstance(v)
+    if v:IsA("BasePart") and not v:IsA("Terrain") then
+        if boostBackup[v] == nil then
+            boostBackup[v] = {Material = v.Material, Reflectance = v.Reflectance, CastShadow = v.CastShadow}
+        end
+        v.Material = Enum.Material.SmoothPlastic
+        v.Reflectance = 0
+        v.CastShadow = false
+    elseif v:IsA("Decal") or v:IsA("Texture") then
+        if boostBackup[v] == nil then boostBackup[v] = {Transparency = v.Transparency} end
+        v.Transparency = 1
+    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+        if boostBackup[v] == nil then boostBackup[v] = {Enabled = v.Enabled} end
+        v.Enabled = false
+    end
+end
+
+function enableBoost()
+    if boostActive then return end
+    boostActive = true
+    boostToken += 1
+    local token = boostToken
+
+    -- Chất lượng đồ họa
+    pcall(function()
+        boostQuality = settings().Rendering.QualityLevel
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    end)
+
+    -- Ánh sáng + hiệu ứng hậu kỳ
+    boostLighting = {GlobalShadows = Lighting.GlobalShadows, FogEnd = Lighting.FogEnd}
+    Lighting.GlobalShadows = false
+    boostEffects = {}
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("PostEffect") then
+            boostEffects[child] = child.Enabled
+            child.Enabled = false
+        end
+    end
+
+    -- Nước
+    local terrain = Workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        boostTerrain = {
+            WaterWaveSize = terrain.WaterWaveSize,
+            WaterWaveSpeed = terrain.WaterWaveSpeed,
+            WaterReflectance = terrain.WaterReflectance,
+            WaterTransparency = terrain.WaterTransparency
+        }
+        terrain.WaterWaveSize = 0
+        terrain.WaterWaveSpeed = 0
+        terrain.WaterReflectance = 0
+        terrain.WaterTransparency = 0
+    end
+
+    -- Vật thể hiện có (chia nhỏ để không đơ game)
+    task.spawn(function()
+        local count = 0
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            if token ~= boostToken or not boostActive then return end
+            pcall(boostInstance, v)
+            count += 1
+            if count % 500 == 0 then task.wait() end
+        end
+    end)
+
+    -- Vật thể mới xuất hiện
+    boostConn = Workspace.DescendantAdded:Connect(function(v)
+        if boostActive then task.defer(pcall, boostInstance, v) end
+    end)
+end
+
+function disableBoost()
+    if not boostActive then return end
+    boostActive = false
+    boostToken += 1
+    if boostConn then boostConn:Disconnect() boostConn = nil end
+
+    pcall(function()
+        if boostQuality then settings().Rendering.QualityLevel = boostQuality end
+    end)
+
+    if boostLighting then
+        for key, value in pairs(boostLighting) do Lighting[key] = value end
+        boostLighting = nil
+    end
+    for effect, enabled in pairs(boostEffects) do
+        if effect and effect.Parent then effect.Enabled = enabled end
+    end
+    boostEffects = {}
+
+    local terrain = Workspace:FindFirstChildOfClass("Terrain")
+    if terrain and boostTerrain then
+        for key, value in pairs(boostTerrain) do terrain[key] = value end
+        boostTerrain = nil
+    end
+
+    task.spawn(function()
+        local count = 0
+        for inst, props in pairs(boostBackup) do
+            if boostActive then return end
+            if inst and inst.Parent then
+                pcall(function()
+                    for key, value in pairs(props) do inst[key] = value end
+                end)
+            end
+            boostBackup[inst] = nil
+            count += 1
+            if count % 500 == 0 then task.wait() end
+        end
+    end)
+end
+
+-- FPS counter
+local fpsText = Drawing.new("Text")
+fpsText.Size = 16
+fpsText.Outline = true
+fpsText.Font = 2
+fpsText.Visible = false
+fpsText.Color = Color3.fromRGB(0, 255, 100)
+local fpsFrames, fpsTime = 0, 0
+
+RunService.RenderStepped:Connect(function(dt)
+    fpsText.Visible = Features.ShowFPS
+    if Features.ShowFPS then
+        fpsFrames += 1
+        fpsTime += dt
+        if fpsTime >= 0.5 then
+            local fps = math.floor(fpsFrames / fpsTime + 0.5)
+            fpsText.Text = "FPS: " .. fps
+            fpsText.Position = Vector2.new(Camera.ViewportSize.X - 90, 8)
+            fpsText.Color = fps >= 50 and Color3.fromRGB(0, 255, 100)
+                or (fps >= 30 and Color3.fromRGB(255, 200, 0) or Color3.fromRGB(255, 60, 60))
+            fpsFrames, fpsTime = 0, 0
+        end
+    end
+end)
+
+-- ===== THIRD PERSON UNLOCK =====
+local tpActive, tpSavedMaxZoom, tpSavedMinZoom, tpSavedMode = false, nil, nil, nil
+local tpLastCFrame = nil
+
+RunService:BindToRenderStep("KhangThirdPerson", Enum.RenderPriority.Camera.Value + 1, function()
+    if not Features.ThirdPerson then
+        if tpActive then
+            tpActive = false
+            tpLastCFrame = nil
+            pcall(function()
+                LocalPlayer.CameraMaxZoomDistance = tpSavedMaxZoom
+                LocalPlayer.CameraMinZoomDistance = tpSavedMinZoom
+                LocalPlayer.CameraMode = tpSavedMode
+            end)
+        end
+        return
+    end
+
+    if not tpActive then
+        tpActive = true
+        tpSavedMaxZoom = LocalPlayer.CameraMaxZoomDistance
+        tpSavedMinZoom = LocalPlayer.CameraMinZoomDistance
+        tpSavedMode = LocalPlayer.CameraMode
+    end
+
+    -- Mở khóa zoom của Roblox (dùng cho game camera mặc định)
+    pcall(function()
+        LocalPlayer.CameraMode = Enum.CameraMode.Classic
+        LocalPlayer.CameraMaxZoomDistance = math.max(Features.TPDistance + 10, 128)
+        LocalPlayer.CameraMinZoomDistance = 0.5
+    end)
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    -- Hiện lại thân nhân vật (game thường ẩn khi ở góc nhìn thứ nhất)
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then part.LocalTransparencyModifier = 0 end
+    end
+
+    -- Nếu game chưa cập nhật camera trong frame này thì không cộng thêm khoảng lùi lần nữa
+    local cf = Camera.CFrame
+    if tpLastCFrame and cf == tpLastCFrame then return end
+
+    local desired = cf * CFrame.new(0, 0, Features.TPDistance)
+    local dir = desired.Position - cf.Position
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {char}
+    local hit = Workspace:Raycast(cf.Position, dir, params)
+    local pos = hit and (hit.Position - dir.Unit * 0.5) or desired.Position
+
+    local newCF = CFrame.new(pos) * (cf - cf.Position)
+    Camera.CFrame = newCF
+    tpLastCFrame = newCF
+end)
+
+-- ===== TEXTURE PACK / MAP DARKENER / UNLOAD (module gốc: n1ghtmare_delta) =====
+local function batchProcess(items, callback, batchSize)
+    batchSize = batchSize or 120
+    task.spawn(function()
+        for i = 1, #items do
+            if khangUnloaded then break end
+            callback(items[i])
+            if i % batchSize == 0 then
+                task.wait()
+            end
+        end
+    end)
+end
+
+local function showNotification(titleText, bodyText, duration)
+    if khangUnloaded then return end
+    duration = duration or 5
+
+    local NotifFrame = Instance.new("Frame")
+    NotifFrame.Name = "NotificationFrame"
+    NotifFrame.Size = UDim2.new(0, 250, 0, 52)
+    NotifFrame.Position = UDim2.new(0, -270, 1, -70)
+    NotifFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
+    NotifFrame.BorderColor3 = Color3.fromRGB(65, 65, 70)
+    NotifFrame.BorderSizePixel = 1
+    NotifFrame.ZIndex = 200
+    NotifFrame.Parent = ScreenGui
+
+    local AccentBar = Instance.new("Frame")
+    AccentBar.Size = UDim2.new(0, 3, 1, 0)
+    AccentBar.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    AccentBar.BorderSizePixel = 0
+    AccentBar.ZIndex = 201
+    AccentBar.Parent = NotifFrame
+
+    local NotifTitle = Instance.new("TextLabel")
+    NotifTitle.Size = UDim2.new(1, -15, 0, 20)
+    NotifTitle.Position = UDim2.new(0, 12, 0, 6)
+    NotifTitle.BackgroundTransparency = 1
+    NotifTitle.Font = Enum.Font.Code
+    NotifTitle.Text = titleText
+    NotifTitle.TextColor3 = Color3.fromRGB(0, 170, 255)
+    NotifTitle.TextSize = 12
+    NotifTitle.TextXAlignment = Enum.TextXAlignment.Left
+    NotifTitle.ZIndex = 201
+    NotifTitle.Parent = NotifFrame
+
+    local NotifBody = Instance.new("TextLabel")
+    NotifBody.Size = UDim2.new(1, -15, 0, 20)
+    NotifBody.Position = UDim2.new(0, 12, 0, 26)
+    NotifBody.BackgroundTransparency = 1
+    NotifBody.Font = Enum.Font.Code
+    NotifBody.Text = bodyText
+    NotifBody.TextColor3 = Color3.fromRGB(200, 200, 205)
+    NotifBody.TextSize = 11
+    NotifBody.TextXAlignment = Enum.TextXAlignment.Left
+    NotifBody.ZIndex = 201
+    NotifBody.Parent = NotifFrame
+
+    TweenService:Create(NotifFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0, 15, 1, -70)
+    }):Play()
+
+    task.delay(duration, function()
+        if not khangUnloaded and NotifFrame and NotifFrame.Parent then
+            local tweenOut = TweenService:Create(NotifFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+                Position = UDim2.new(0, -270, 1, -70)
+            })
+            tweenOut:Play()
+            tweenOut.Completed:Connect(function()
+                NotifFrame:Destroy()
+            end)
+        end
+    end)
+end
+
+-- ---------- Texture pack ----------
+do
+    local OriginalAssets = setmetatable({}, {__mode = "k"})
+    local IdMap, idMapBuilt = {}, false
+    local packEnabled, textureConn = false, nil
+
+    local function getAsset(url)
+        local success, result = pcall(function()
+            if writefile and isfile and getcustomasset then
+                local fileName = "tex_" .. tostring(string.len(url) % 99999) .. "_" .. tostring(string.byte(url, 10) or 1) .. ".asset"
+                if not isfile(fileName) then
+                    local data = game:HttpGet(url)
+                    if data and #data > 80 then writefile(fileName, data) end
+                end
+                local asset = getcustomasset(fileName)
+                if asset and asset ~= "" then return asset end
+            end
+            return url
+        end)
+        return (success and result) or url
+    end
+
+    local Rules = {
+        {ids = {7658055825}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/grods.png"},
+        {ids = {17803962335}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/attachment.png"},
+        {ids = {13854780213}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/logo.png"},
+        {ids = {13854780042}, url = "https://raw.githubusercontent.com/prism658/undertale-txtpack/main/heartleft.png"},
+        {ids = {81461991645938}, url = "https://raw.githubusercontent.com/prism658/undertale-txtpack/main/lvl.png"},
+        {ids = {16802957270}, url = "https://raw.githubusercontent.com/prism658/undertale-txtpack/main/heartbroken.png"},
+        {ids = {99115398611290}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/icbtw.png"},
+        {ids = {133917828562858, 121503061771505}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/mine.webp"},
+        {ids = {17175092502, 17094014569}, url = "rbxassetid://72106446453934"},
+
+        {ids = {106623367501544, 131795064007344, 73543520622815}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/f.png"},
+        {ids = {80716950169934}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/d-.png"},
+        {ids = {136100661820261}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/d.png"},
+        {ids = {107898816876115}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/d+.png"},
+        {ids = {134520747948636}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/c-.png"},
+        {ids = {114166096331502}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/c.png"},
+        {ids = {90039594400813}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/c+.png"},
+        {ids = {133903971285645}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/b-.png"},
+        {ids = {82834564754747}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/b.png"},
+        {ids = {73345783863790}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/b+.png"},
+        {ids = {113997689031026}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/a-.png"},
+        {ids = {88059506918419}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/a.png"},
+        {ids = {112183171942172}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/a+.png"},
+        {ids = {104871954739030}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/s.png"},
+        {ids = {109012386782238}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/ss.png"},
+        {ids = {127982903682334}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/u.png"},
+        {ids = {133793956251748}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/top200xrank.png"},
+        {ids = {116941545385923}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/nemx.png"},
+
+        {ids = {17138490999}, url = "rbxassetid://1721952882"},
+        {ids = {103035811146294}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/allclear.base.ogg"},
+        {ids = {16810041280}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/allclear.base.ogg"},
+        {ids = {16810321565}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/allclear.base.ogg"},
+        {ids = {16770456156, 16492958314}, url = "rbxassetid://2428506580"},
+        {ids = {16537337310, 16537449730}, url = "rbxassetid://70643163489676"},
+        {ids = {17826470563}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/theeyellow.ogg"},
+        {ids = {18221725850, 18239670056, 18221726246}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/winnerwinner.ogg"},
+        {ids = {17026600996}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/showscore.base.ogg"},
+        {ids = {16530229616}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/kill1.ogg"},
+        {ids = {16530229541}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/kill2.ogg"},
+        {ids = {16530229695}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/kill3.ogg"},
+        {ids = {8483887957}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/clearspin.base.ogg"},
+        {ids = {6384899588}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/lego-build.mp3"},
+        {ids = {16737738420}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/Sliding.mp3"},
+        {ids = {70643163489676}, url = "rbxassetid://17405655409"},
+        {ids = {91547731028928}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/studio-audience-awwww-sound-fx.mp3"},
+        {ids = {138975587469438}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/final-fantasy-vii-victory-fanfare-1.mp3"},
+        {ids = {17697682466, 17733314783}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/kuchu-toshi.mp3"},
+        {ids = {177266782}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/menuclick.base.ogg"},
+        {ids = {18525513345}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/achievement_3.base.ogg"},
+        {ids = {13110130082}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/target.base.ogg"},
+        {ids = {17467242617}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/bluer.ogg"},
+        {ids = {17016581922}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/elimin.mp3"},
+    }
+
+    -- Tải tài nguyên khi bật lần đầu (không chặn lúc load script)
+    local function buildIdMap()
+        if idMapBuilt then return end
+        for _, rule in ipairs(Rules) do
+            if khangUnloaded then return end
+            local asset = getAsset(rule.url)
+            for _, id in ipairs(rule.ids) do IdMap[tostring(id)] = asset end
+        end
+        idMapBuilt = true
+    end
+
+    local function restoreAllOriginalAssets()
+        for obj, props in pairs(OriginalAssets) do
+            if obj and obj.Parent then
+                for propName, origVal in pairs(props) do
+                    pcall(function() obj[propName] = origVal end)
+                end
+            end
+        end
+        table.clear(OriginalAssets)
+    end
+
+    local function applyTextureSwap(obj)
+        if khangUnloaded or not packEnabled or not obj then return end
+
+        local function replace(property)
+            local success, value = pcall(function() return obj[property] end)
+            if not success or type(value) ~= "string" then return end
+
+            local id = string.match(value, "%d+")
+            if id and IdMap[id] then
+                if not OriginalAssets[obj] then OriginalAssets[obj] = {} end
+                if not OriginalAssets[obj][property] then OriginalAssets[obj][property] = value end
+                pcall(function() obj[property] = IdMap[id] end)
+            end
+        end
+
+        if obj:IsA("Sound") then replace("SoundId")
+        elseif obj:IsA("ImageLabel") or obj:IsA("ImageButton") then replace("Image")
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then replace("Texture")
+        elseif obj:IsA("MeshPart") then replace("TextureID") end
+    end
+
+    function enableTexturePack()
+        if packEnabled then return end
+        packEnabled = true
+        task.spawn(function()
+            buildIdMap()
+            if not packEnabled or khangUnloaded then return end
+            batchProcess(game:GetDescendants(), applyTextureSwap, 150)
+            textureConn = game.DescendantAdded:Connect(function(obj)
+                if packEnabled and not khangUnloaded and (obj:IsA("Sound") or obj:IsA("ImageLabel") or obj:IsA("ImageButton") or obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("MeshPart")) then
+                    task.defer(applyTextureSwap, obj)
+                end
+            end)
+        end)
+    end
+
+    function disableTexturePack()
+        packEnabled = false
+        if textureConn then
+            textureConn:Disconnect()
+            textureConn = nil
+        end
+        restoreAllOriginalAssets()
+    end
+end
+
+-- ---------- Map darkener ----------
+do
+    local darkenerEnabled, darknessLevel = false, 10
+    local originalPartColors = setmetatable({}, {__mode = "k"})
+    local originalLighting = nil
+    local darkenerConn = nil
+
+    local function getMultiplier()
+        return (10 - darknessLevel) * 0.06
+    end
+
+    local function updateLighting()
+        if darkenerEnabled and not khangUnloaded then
+            local mult = getMultiplier()
+            Lighting.Brightness = mult
+            Lighting.OutdoorAmbient = Color3.fromRGB(math.floor(20 * mult), math.floor(20 * mult), math.floor(25 * mult))
+            Lighting.Ambient = Color3.fromRGB(math.floor(15 * mult), math.floor(15 * mult), math.floor(20 * mult))
+        end
+    end
+
+    local function darkenInstance(part)
+        if khangUnloaded or not darkenerEnabled or not part or not part:IsA("BasePart") or not part:IsDescendantOf(Workspace) then return end
+
+        local model = part:FindFirstAncestorOfClass("Model")
+        if model and Players:GetPlayerFromCharacter(model) then return end
+        if part.Name == "HumanoidRootPart" or (part.Parent and part.Parent.Name == "Camera") then return end
+
+        if not originalPartColors[part] then
+            originalPartColors[part] = part.Color
+        end
+        local h, s, v = Color3.toHSV(originalPartColors[part])
+        part.Color = Color3.fromHSV(h, s, math.clamp(v * getMultiplier(), 0, 1))
+    end
+
+    local function applyDarknessToAll()
+        updateLighting()
+        batchProcess(Workspace:GetDescendants(), darkenInstance, 200)
+    end
+
+    function enableDarkener()
+        if darkenerEnabled then return end
+        darkenerEnabled = true
+        originalLighting = {
+            Brightness = Lighting.Brightness,
+            OutdoorAmbient = Lighting.OutdoorAmbient,
+            Ambient = Lighting.Ambient
+        }
+        applyDarknessToAll()
+        darkenerConn = Workspace.DescendantAdded:Connect(function(obj)
+            if darkenerEnabled and not khangUnloaded and obj:IsA("BasePart") then
+                task.defer(darkenInstance, obj)
+            end
+        end)
+    end
+
+    function disableDarkener()
+        if not darkenerEnabled then return end
+        darkenerEnabled = false
+        if darkenerConn then
+            darkenerConn:Disconnect()
+            darkenerConn = nil
+        end
+        if originalLighting then
+            Lighting.Brightness = originalLighting.Brightness
+            Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+            Lighting.Ambient = originalLighting.Ambient
+            originalLighting = nil
+        end
+        task.spawn(function()
+            local count = 0
+            for part, origColor in pairs(originalPartColors) do
+                if part and part:IsDescendantOf(Workspace) then
+                    pcall(function() part.Color = origColor end)
+                end
+                originalPartColors[part] = nil
+                count += 1
+                if count % 500 == 0 then task.wait() end
+            end
+        end)
+    end
+
+    function setDarkness(level)
+        darknessLevel = level
+        if darkenerEnabled then applyDarknessToAll() end
+    end
+end
+
+-- ---------- MC texture (script ngoài) ----------
+function runMcTexture(btn)
+    btn.Text = "Loading... (Please wait)"
+    btn.TextColor3 = Color3.fromRGB(240, 200, 100)
+    task.spawn(function()
+        local ok = pcall(function()
+            loadstring(game:HttpGet("https://pastebin.com/raw/Cb9ExUkB"))()
+        end)
+        if not khangUnloaded then
+            btn.Text = ok and "MC Texture loaded!" or "Failed to load"
+            btn.TextColor3 = ok and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+        end
+    end)
+end
+
+-- ---------- Unload toàn bộ Khang Hub ----------
+function unloadHub()
+    if khangUnloaded then return end
+    khangUnloaded = true
+
+    -- Tắt mọi tính năng để các vòng lặp tự khôi phục trạng thái (speed, fly, fullbright, FOV, camera...)
+    for key, value in pairs(Features) do
+        if type(value) == "boolean" then Features[key] = false end
+    end
+    for key in pairs(Keybinds) do Keybinds[key] = nil end
+
+    pcall(disableTexturePack)
+    pcall(disableDarkener)
+    pcall(disableBoost)
+    pcall(disableSky)
+
+    task.wait(0.3)
+
+    for player, hl in pairs(chams) do
+        pcall(function() hl:Destroy() end)
+        chams[player] = nil
+    end
+    for player in pairs(espObjects) do
+        removeESP(player)
+    end
+    pcall(function() FOVCircle.Visible = false end)
+    pcall(function() AimbotCircle.Visible = false end)
+    pcall(function() fpsText.Visible = false end)
+    pcall(function() RunService:UnbindFromRenderStep("KhangThirdPerson") end)
+    pcall(stopFly)
+
+    pcall(function() ScreenGui:Destroy() end)
+    pcall(function() collectgarbage("collect") end)
+end
+
+showNotification("Khang Hub", "Script loaded! RightShift = ẩn/hiện menu", 5)
+
+-- ===== SKY CHANGER =====
+local SKY_PRESETS = {
+    {name = "Sunset", time = 18, stars = 0, density = 35, haze = 1.5, glare = 0.6,
+        atmoColor = Color3.fromRGB(255, 150, 100), atmoDecay = Color3.fromRGB(255, 100, 80), top = Color3.fromRGB(255, 140, 80)},
+    {name = "Night", time = 0, stars = 3000, density = 20, haze = 0.5, glare = 0,
+        atmoColor = Color3.fromRGB(40, 50, 110), atmoDecay = Color3.fromRGB(20, 20, 60), top = Color3.fromRGB(60, 70, 140)},
+    {name = "Space", time = 0, stars = 5000, density = 0, haze = 0, glare = 0,
+        atmoColor = Color3.fromRGB(0, 0, 0), atmoDecay = Color3.fromRGB(0, 0, 0), top = Color3.fromRGB(0, 0, 0)},
+    {name = "Galaxy", time = 0, stars = 4000, density = 30, haze = 1, glare = 0,
+        atmoColor = Color3.fromRGB(150, 80, 255), atmoDecay = Color3.fromRGB(80, 40, 160), top = Color3.fromRGB(170, 90, 255)},
+    {name = "Pink Dream", time = 18, stars = 500, density = 40, haze = 1.2, glare = 0.4,
+        atmoColor = Color3.fromRGB(255, 150, 200), atmoDecay = Color3.fromRGB(255, 100, 170), top = Color3.fromRGB(255, 120, 200)},
+    {name = "Toxic", time = 22, stars = 1500, density = 40, haze = 1.5, glare = 0,
+        atmoColor = Color3.fromRGB(90, 255, 120), atmoDecay = Color3.fromRGB(30, 140, 60), top = Color3.fromRGB(80, 255, 120)},
+    {name = "Clear Day", time = 14, stars = 0, density = 25, haze = 0.5, glare = 0.2,
+        atmoColor = Color3.fromRGB(170, 200, 255), atmoDecay = Color3.fromRGB(90, 120, 180), top = Color3.fromRGB(0, 0, 0)},
+    {name = "Overcast", time = 13, stars = 0, density = 60, haze = 2.5, glare = 0,
+        atmoColor = Color3.fromRGB(150, 150, 160), atmoDecay = Color3.fromRGB(100, 100, 110), top = Color3.fromRGB(200, 200, 210)},
+}
+
+Features.SkyChanger = false
+Features.SkyPreset = 1
+Features.SkyTime = SKY_PRESETS[1].time
+Features.SkyStars = SKY_PRESETS[1].stars
+Features.SkyDensity = SKY_PRESETS[1].density
+Features.SkyRainbow = false
+
+do
+    local skyActive = false
+    local skyBackup, storedObjects, skyInst, atmoInst = nil, {}, nil, nil
+
+    local function applySky()
+        local preset = SKY_PRESETS[Features.SkyPreset] or SKY_PRESETS[1]
+        Lighting.ClockTime = Features.SkyTime
+        Lighting.ColorShift_Top = preset.top
+        if skyInst then skyInst.StarCount = Features.SkyStars end
+        if atmoInst then
+            atmoInst.Density = Features.SkyDensity / 100
+            atmoInst.Haze = preset.haze
+            atmoInst.Glare = preset.glare
+            atmoInst.Decay = preset.atmoDecay
+            atmoInst.Color = Features.SkyRainbow and Color3.fromHSV((tick() % 6) / 6, 0.55, 1) or preset.atmoColor
+        end
+    end
+
+    function enableSky()
+        if skyActive then return end
+        skyActive = true
+        skyBackup = {
+            ClockTime = Lighting.ClockTime,
+            ColorShift_Top = Lighting.ColorShift_Top,
+            ColorShift_Bottom = Lighting.ColorShift_Bottom,
+        }
+
+        -- Cất sky / atmosphere gốc của game để dùng cái của mình
+        storedObjects = {}
+        for _, child in ipairs(Lighting:GetChildren()) do
+            if child:IsA("Sky") or child:IsA("Atmosphere") then
+                table.insert(storedObjects, child)
+                child.Parent = nil
+            end
+        end
+
+        skyInst = Instance.new("Sky")
+        skyInst.Name = "KhangSky"
+        skyInst.CelestialBodiesShown = true
+        skyInst.Parent = Lighting
+
+        atmoInst = Instance.new("Atmosphere")
+        atmoInst.Name = "KhangAtmosphere"
+        atmoInst.Parent = Lighting
+
+        applySky()
+    end
+
+    function disableSky()
+        if not skyActive then return end
+        skyActive = false
+
+        if skyInst then skyInst:Destroy() skyInst = nil end
+        if atmoInst then atmoInst:Destroy() atmoInst = nil end
+        for _, obj in ipairs(storedObjects) do
+            pcall(function() obj.Parent = Lighting end)
+        end
+        storedObjects = {}
+
+        if skyBackup then
+            for key, value in pairs(skyBackup) do
+                pcall(function() Lighting[key] = value end)
+            end
+            skyBackup = nil
+        end
+    end
+
+    RunService.RenderStepped:Connect(function()
+        if skyActive and not khangUnloaded then applySky() end
+    end)
+end
+
+-- ===== TARGET STRAFE + ANTI AIM =====
+do
+    local strafeAngle = 0
+    local strafeTarget = nil
+    local aaYaw, aaFlip = 0, false
+    local aaActive, aaSavedAutoRotate = false, true
+
+    local function findStrafeTarget(rootPos)
+        local best, bestDist = nil, Features.StrafeRange
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and isEnemy(player) and player.Character then
+                local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                if hum and hrp and hum.Health > 0 then
+                    local d = (hrp.Position - rootPos).Magnitude
+                    if d <= bestDist then
+                        best, bestDist = hrp, d
+                    end
+                end
+            end
+        end
+        return best
+    end
+
+    RunService.Heartbeat:Connect(function(dt)
+        local hum, root = getHumanoid(), getRoot()
+        local alive = hum and root and hum.Health > 0
+
+        -- Target Strafe: bay vòng quanh địch gần nhất
+        if Features.TargetStrafe and alive then
+            local valid = strafeTarget ~= nil
+                and strafeTarget.Parent ~= nil
+                and (strafeTarget.Position - root.Position).Magnitude <= Features.StrafeRange
+            if valid then
+                local targetHum = strafeTarget.Parent:FindFirstChildOfClass("Humanoid")
+                valid = targetHum ~= nil and targetHum.Health > 0
+            end
+            if not valid then
+                strafeTarget = findStrafeTarget(root.Position)
+            end
+
+            if strafeTarget then
+                strafeAngle += math.rad(Features.StrafeSpeed * 45) * dt
+                local center = strafeTarget.Position
+                local pos = center + Vector3.new(
+                    math.cos(strafeAngle) * Features.StrafeRadius,
+                    Features.StrafeY,
+                    math.sin(strafeAngle) * Features.StrafeRadius
+                )
+                if Features.StrafeFace then
+                    root.CFrame = CFrame.new(pos, Vector3.new(center.X, pos.Y, center.Z))
+                else
+                    root.CFrame = CFrame.new(pos) * (root.CFrame - root.CFrame.Position)
+                end
+                root.AssemblyLinearVelocity = Vector3.zero
+            end
+        else
+            strafeTarget = nil
+        end
+
+        -- Anti Aim: xoay / giật hướng nhân vật
+        if Features.AntiAim and alive then
+            if not aaActive then
+                aaActive = true
+                aaSavedAutoRotate = hum.AutoRotate
+            end
+            hum.AutoRotate = false
+
+            local look = Camera.CFrame.LookVector
+            local camYaw = math.atan2(-look.X, -look.Z)
+            local yaw
+            local mode = Features.AntiAimMode
+            if mode == 1 then
+                aaYaw += math.rad(Features.AntiAimSpeed * 20) * dt
+                yaw = aaYaw
+            elseif mode == 2 then
+                aaFlip = not aaFlip
+                yaw = camYaw + (aaFlip and 1.5708 or -1.5708)
+            elseif mode == 3 then
+                yaw = camYaw + math.pi
+            else
+                yaw = math.rad(math.random(0, 359))
+            end
+            root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
+        elseif aaActive then
+            aaActive = false
+            if hum then hum.AutoRotate = aaSavedAutoRotate end
+        end
+    end)
+end
+
+-- ===== CLICKGUI: panel nhiều cột (RightShift để ẩn/hiện) =====
+do
+    local COLORS = {
+        panel = Color3.fromRGB(26, 26, 30),
+        settings = Color3.fromRGB(34, 34, 39),
+        accent = Color3.fromRGB(84, 112, 255),
+        text = Color3.fromRGB(235, 235, 240),
+        sub = Color3.fromRGB(165, 165, 175),
+        off = Color3.fromRGB(62, 62, 70),
+    }
+
+    if Features.Darkness == nil then Features.Darkness = 10 end
+
+    -- ---------- Tùy chọn giao diện ----------
+    local HttpService = game:GetService("HttpService")
+
+    local THEMES = {
+        {name = "Blue", color = Color3.fromRGB(84, 112, 255)},
+        {name = "Purple", color = Color3.fromRGB(150, 90, 255)},
+        {name = "Red", color = Color3.fromRGB(235, 70, 80)},
+        {name = "Green", color = Color3.fromRGB(60, 200, 120)},
+        {name = "Orange", color = Color3.fromRGB(255, 150, 50)},
+        {name = "Pink", color = Color3.fromRGB(255, 100, 180)},
+        {name = "Cyan", color = Color3.fromRGB(0, 190, 230)},
+    }
+    local BACKGROUNDS = {
+        {name = "Dark", panel = Color3.fromRGB(26, 26, 30), settings = Color3.fromRGB(34, 34, 39)},
+        {name = "Black", panel = Color3.fromRGB(10, 10, 12), settings = Color3.fromRGB(20, 20, 23)},
+        {name = "Navy", panel = Color3.fromRGB(18, 22, 38), settings = Color3.fromRGB(26, 32, 52)},
+        {name = "Gray", panel = Color3.fromRGB(48, 48, 54), settings = Color3.fromRGB(60, 60, 68)},
+    }
+
+    local PANEL_STYLES = {{name = "Click GUI"}, {name = "Classic"}}
+    local UI_DEFAULTS = {PanelStyle = 1, ThemeIndex = 1, BgIndex = 1, PanelScale = 100, PanelTransparency = 5, PanelCorner = 14}
+    for key, value in pairs(UI_DEFAULTS) do
+        if Features[key] == nil then Features[key] = value end
+    end
+
+    local UI_FILE = "KhangHub_ui.json"
+    pcall(function()
+        if readfile and isfile and isfile(UI_FILE) then
+            local data = HttpService:JSONDecode(readfile(UI_FILE))
+            for key in pairs(UI_DEFAULTS) do
+                if type(data[key]) == "number" then Features[key] = data[key] end
+            end
+        end
+    end)
+    Features.ThemeIndex = math.clamp(math.floor(Features.ThemeIndex), 1, #THEMES)
+    Features.BgIndex = math.clamp(math.floor(Features.BgIndex), 1, #BACKGROUNDS)
+    Features.PanelStyle = math.clamp(math.floor(Features.PanelStyle), 1, #PANEL_STYLES)
+
+    COLORS.accent = THEMES[Features.ThemeIndex].color
+    COLORS.panel = BACKGROUNDS[Features.BgIndex].panel
+    COLORS.settings = BACKGROUNDS[Features.BgIndex].settings
+
+    local uiSaveToken = 0
+    local function saveUI()
+        if not writefile then return end
+        uiSaveToken += 1
+        local token = uiSaveToken
+        task.delay(0.5, function()
+            if token ~= uiSaveToken then return end
+            pcall(function()
+                local data = {}
+                for key in pairs(UI_DEFAULTS) do data[key] = Features[key] end
+                writefile(UI_FILE, HttpService:JSONEncode(data))
+            end)
+        end)
+    end
+
+    local function new(class, props, parent)
+        local obj = Instance.new(class)
+        for key, value in pairs(props) do obj[key] = value end
+        obj.Parent = parent
+        return obj
+    end
+
+    local ClickGui = new("Frame", {
+        Name = "ClickGui",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+    }, ScreenGui)
+
+    -- Nút Modal để mở khóa chuột khi menu đang hiện
+    new("TextButton", {
+        Size = UDim2.new(0, 0, 0, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        Modal = true,
+    }, ClickGui)
+
+    -- ---------- Đồng bộ trạng thái ----------
+    local refreshers = {}
+    local function addRefresher(key, fn)
+        refreshers[key] = refreshers[key] or {}
+        table.insert(refreshers[key], fn)
+    end
+    local function refresh(key)
+        if refreshers[key] then
+            for _, fn in ipairs(refreshers[key]) do fn() end
+        end
+    end
+
+    -- Chọn giữa Click GUI (panel nhiều cột) và Classic (menu danh sách cũ)
+    local menuOpen = true
+    local function updateMenus()
+        local classic = Features.PanelStyle == 2
+        ClickGui.Visible = menuOpen and not classic
+        MainFrame.Visible = menuOpen and classic
+        if classic then
+            for _, fn in ipairs(LegacySync) do pcall(fn) end
+        else
+            for key in pairs(refreshers) do refresh(key) end
+        end
+    end
+
+    local themed, panels = {}, {}
+    local relayout, applyTheme
+
+    local function track(obj, prop, colorKey)
+        table.insert(themed, {obj = obj, prop = prop, colorKey = colorKey})
+        return obj
+    end
+
+    applyTheme = function()
+        local theme = THEMES[Features.ThemeIndex] or THEMES[1]
+        local bg = BACKGROUNDS[Features.BgIndex] or BACKGROUNDS[1]
+        COLORS.accent = theme.color
+        COLORS.panel = bg.panel
+        COLORS.settings = bg.settings
+        for _, item in ipairs(themed) do
+            pcall(function() item.obj[item.prop] = COLORS[item.colorKey] end)
+        end
+        for key in pairs(refreshers) do refresh(key) end
+    end
+
+    local onChange = {
+        PanelStyle = function()
+            menuOpen = true
+            updateMenus()
+        end,
+        ThemeIndex = function() applyTheme() end,
+        BgIndex = function() applyTheme() end,
+        PanelScale = function(value)
+            for _, p in ipairs(panels) do p.scale.Scale = value / 100 end
+            relayout()
+        end,
+        PanelTransparency = function(value)
+            for _, p in ipairs(panels) do p.frame.BackgroundTransparency = value / 100 end
+        end,
+        PanelCorner = function(value)
+            for _, p in ipairs(panels) do p.corner.CornerRadius = UDim.new(0, value) end
+        end,
+        SkinChanger = function(state)
+            if state and not skinInitialized then
+                skinInitialized = true
+                local ok, err = pcall(InitSkinChanger)
+                if not ok then warn("[Khang Hub] Skin Changer error: " .. tostring(err)) end
+            end
+        end,
+        FPSBoost = function(state)
+            if state then enableBoost() else disableBoost() end
+        end,
+        TexturePack = function(state)
+            if state then enableTexturePack() else disableTexturePack() end
+        end,
+        MapDarkener = function(state)
+            if state then enableDarkener() else disableDarkener() end
+        end,
+        Darkness = function(value)
+            setDarkness(value)
+        end,
+        SkyChanger = function(state)
+            if state then enableSky() else disableSky() end
+        end,
+        SkyPreset = function(index)
+            local preset = SKY_PRESETS[index] or SKY_PRESETS[1]
+            setFeature("SkyTime", preset.time)
+            setFeature("SkyStars", preset.stars)
+            setFeature("SkyDensity", preset.density)
+        end,
+    }
+
+    local function setFeature(key, value)
+        if Features[key] == value then return end
+        Features[key] = value
+        local cb = onChange[key]
+        if cb then task.spawn(cb, value) end
+        refresh(key)
+        if UI_DEFAULTS[key] ~= nil then saveUI() end
+    end
+
+    -- ---------- Kéo thả (panel + slider dùng chung) ----------
+    local activeDrag = nil
+    UserInputService.InputChanged:Connect(function(input)
+        if activeDrag and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            activeDrag(input)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            activeDrag = nil
+        end
+    end)
+
+    -- ---------- Thành phần cài đặt ----------
+    local function createSlider(parent, st, order)
+        local Row = new("Frame", {
+            Size = UDim2.new(1, 0, 0, 32),
+            BackgroundTransparency = 1,
+            LayoutOrder = order,
+        }, parent)
+
+        new("TextLabel", {
+            Size = UDim2.new(0.6, -8, 0, 16),
+            Position = UDim2.new(0, 8, 0, 3),
+            BackgroundTransparency = 1,
+            Text = st.name,
+            TextColor3 = COLORS.text,
+            TextSize = 12,
+            Font = Enum.Font.Gotham,
+            TextXAlignment = Enum.TextXAlignment.Left,
+        }, Row)
+
+        local ValueLabel = new("TextLabel", {
+            Size = UDim2.new(0.4, -8, 0, 16),
+            Position = UDim2.new(0.6, 0, 0, 3),
+            BackgroundTransparency = 1,
+            TextColor3 = COLORS.sub,
+            TextSize = 12,
+            Font = Enum.Font.Gotham,
+            TextXAlignment = Enum.TextXAlignment.Right,
+        }, Row)
+
+        local Track = new("Frame", {
+            Position = UDim2.new(0, 8, 0, 24),
+            Size = UDim2.new(1, -16, 0, 2),
+            BackgroundColor3 = COLORS.off,
+            BorderSizePixel = 0,
+        }, Row)
+        local Fill = new("Frame", {
+            Size = UDim2.new(0, 0, 1, 0),
+            BackgroundColor3 = COLORS.accent,
+            BorderSizePixel = 0,
+        }, Track)
+        track(Fill, "BackgroundColor3", "accent")
+        local Knob = new("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Size = UDim2.new(0, 8, 0, 8),
+            Position = UDim2.new(0, 0, 0.5, 0),
+            BackgroundColor3 = COLORS.text,
+            BorderSizePixel = 0,
+        }, Track)
+        new("UICorner", {CornerRadius = UDim.new(1, 0)}, Knob)
+
+        local Hit = new("TextButton", {
+            Position = UDim2.new(0, 4, 0, 14),
+            Size = UDim2.new(1, -8, 0, 18),
+            BackgroundTransparency = 1,
+            Text = "",
+        }, Row)
+
+        local function visual()
+            local value = Features[st.key] or st.min
+            local pos = math.clamp((value - st.min) / (st.max - st.min), 0, 1)
+            Fill.Size = UDim2.new(pos, 0, 1, 0)
+            Knob.Position = UDim2.new(pos, 0, 0.5, 0)
+            ValueLabel.Text = tostring(value)
+        end
+
+        local function updateFromInput(input)
+            local rel = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+            setFeature(st.key, math.floor(st.min + (st.max - st.min) * rel + 0.5))
+        end
+
+        Hit.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                activeDrag = updateFromInput
+                updateFromInput(input)
+            end
+        end)
+
+        addRefresher(st.key, visual)
+        visual()
+    end
+
+    local function createToggleSetting(parent, st, order)
+        local Btn = new("TextButton", {
+            Size = UDim2.new(1, 0, 0, 24),
+            BackgroundTransparency = 1,
+            Text = "",
+            AutoButtonColor = false,
+            LayoutOrder = order,
+        }, parent)
+
+        new("TextLabel", {
+            Size = UDim2.new(1, -50, 1, 0),
+            Position = UDim2.new(0, 8, 0, 0),
+            BackgroundTransparency = 1,
+            Text = st.name,
+            TextColor3 = COLORS.text,
+            TextSize = 12,
+            Font = Enum.Font.Gotham,
+            TextXAlignment = Enum.TextXAlignment.Left,
+        }, Btn)
+
+        local Pill = new("Frame", {
+            AnchorPoint = Vector2.new(1, 0.5),
+            Size = UDim2.new(0, 28, 0, 14),
+            Position = UDim2.new(1, -8, 0.5, 0),
+            BorderSizePixel = 0,
+        }, Btn)
+        new("UICorner", {CornerRadius = UDim.new(1, 0)}, Pill)
+        local Dot = new("Frame", {
+            Size = UDim2.new(0, 10, 0, 10),
+            BackgroundColor3 = COLORS.text,
+            BorderSizePixel = 0,
+        }, Pill)
+        new("UICorner", {CornerRadius = UDim.new(1, 0)}, Dot)
+
+        local function visual()
+            local on = Features[st.key] and true or false
+            Pill.BackgroundColor3 = on and COLORS.accent or COLORS.off
+            Dot.Position = on and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
+        end
+
+        Btn.MouseButton1Click:Connect(function()
+            setFeature(st.key, not Features[st.key])
+        end)
+
+        addRefresher(st.key, visual)
+        visual()
+    end
+
+    local function createCycle(parent, st, order)
+        local Btn = new("TextButton", {
+            Size = UDim2.new(1, 0, 0, 24),
+            BackgroundTransparency = 1,
+            Text = "",
+            AutoButtonColor = false,
+            LayoutOrder = order,
+        }, parent)
+
+        new("TextLabel", {
+            Size = UDim2.new(0.5, -8, 1, 0),
+            Position = UDim2.new(0, 8, 0, 0),
+            BackgroundTransparency = 1,
+            Text = st.name,
+            TextColor3 = COLORS.text,
+            TextSize = 12,
+            Font = Enum.Font.Gotham,
+            TextXAlignment = Enum.TextXAlignment.Left,
+        }, Btn)
+
+        local ValueLabel = new("TextLabel", {
+            Size = UDim2.new(0.5, -8, 1, 0),
+            Position = UDim2.new(0.5, 0, 0, 0),
+            BackgroundTransparency = 1,
+            TextColor3 = COLORS.accent,
+            TextSize = 12,
+            Font = Enum.Font.GothamMedium,
+            TextXAlignment = Enum.TextXAlignment.Right,
+        }, Btn)
+        track(ValueLabel, "TextColor3", "accent")
+
+        local function visual()
+            local option = st.options[Features[st.key]] or st.options[1]
+            ValueLabel.Text = "< " .. option.name .. " >"
+        end
+
+        Btn.MouseButton1Click:Connect(function()
+            setFeature(st.key, (Features[st.key] % #st.options) + 1)
+        end)
+
+        addRefresher(st.key, visual)
+        visual()
+    end
+
+    local function createButtonSetting(parent, st, order)
+        local Btn = new("TextButton", {
+            Size = UDim2.new(1, 0, 0, 24),
+            BackgroundTransparency = 1,
+            Text = st.name,
+            TextColor3 = COLORS.sub,
+            TextSize = 12,
+            Font = Enum.Font.Gotham,
+            AutoButtonColor = false,
+            LayoutOrder = order,
+        }, parent)
+        Btn.MouseButton1Click:Connect(function()
+            st.action()
+        end)
+    end
+
+    -- ---------- Module ----------
+    local allModules = {}
+    local listening = nil
+
+    local function triggerModule(mod, btn)
+        if mod.key then
+            setFeature(mod.key, not Features[mod.key])
+        elseif mod.action then
+            mod.action(btn)
+        end
+    end
+
+    local function createModule(parent, mod, order)
+        table.insert(allModules, mod)
+
+        local Container = new("Frame", {
+            Size = UDim2.new(1, 0, 0, 0),
+            AutomaticSize = Enum.AutomaticSize.Y,
+            BackgroundTransparency = 1,
+            LayoutOrder = order,
+        }, parent)
+        new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder}, Container)
+
+        local Btn = new("TextButton", {
+            Size = UDim2.new(1, 0, 0, 26),
+            BackgroundColor3 = COLORS.accent,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            Text = mod.name,
+            TextColor3 = mod.color or COLORS.text,
+            TextSize = 13,
+            Font = Enum.Font.Gotham,
+            AutoButtonColor = false,
+            LayoutOrder = 0,
+        }, Container)
+        track(Btn, "BackgroundColor3", "accent")
+
+        local hasSettings = mod.key ~= nil or mod.settings ~= nil
+        local Arrow
+        if hasSettings then
+            Arrow = new("TextLabel", {
+                Size = UDim2.new(0, 16, 1, 0),
+                Position = UDim2.new(1, -18, 0, 0),
+                BackgroundTransparency = 1,
+                Text = "+",
+                TextColor3 = COLORS.sub,
+                TextSize = 13,
+                Font = Enum.Font.Gotham,
+            }, Btn)
+        end
+
+        if mod.key then
+            local function visual()
+                Btn.BackgroundTransparency = Features[mod.key] and 0 or 1
+            end
+            addRefresher(mod.key, visual)
+            visual()
+        end
+
+        Btn.MouseButton1Click:Connect(function()
+            triggerModule(mod, Btn)
+        end)
+
+        if hasSettings then
+            local Settings = new("Frame", {
+                Size = UDim2.new(1, 0, 0, 0),
+                AutomaticSize = Enum.AutomaticSize.Y,
+                BackgroundColor3 = COLORS.settings,
+                BorderSizePixel = 0,
+                Visible = false,
+                LayoutOrder = 1,
+            }, Container)
+            track(Settings, "BackgroundColor3", "settings")
+            new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder}, Settings)
+
+            local index = 0
+            for _, st in ipairs(mod.settings or {}) do
+                index += 1
+                if st.type == "slider" then
+                    createSlider(Settings, st, index)
+                elseif st.type == "cycle" then
+                    createCycle(Settings, st, index)
+                elseif st.type == "button" then
+                    createButtonSetting(Settings, st, index)
+                else
+                    createToggleSetting(Settings, st, index)
+                end
+            end
+
+            -- Dòng gán phím
+            if mod.key then
+            index += 1
+            local BindBtn = new("TextButton", {
+                Size = UDim2.new(1, 0, 0, 24),
+                BackgroundTransparency = 1,
+                Text = "Bind: None",
+                TextColor3 = COLORS.sub,
+                TextSize = 12,
+                Font = Enum.Font.Gotham,
+                AutoButtonColor = false,
+                LayoutOrder = index,
+            }, Settings)
+            mod.bindButton = BindBtn
+
+            BindBtn.MouseButton1Click:Connect(function()
+                listening = mod
+                BindBtn.Text = "Bind: press a key..."
+            end)
+            end
+
+            local function toggleSettings()
+                Settings.Visible = not Settings.Visible
+                Arrow.Text = Settings.Visible and "-" or "+"
+            end
+            Btn.MouseButton2Click:Connect(toggleSettings)
+            if not mod.key then Btn.MouseButton1Click:Connect(toggleSettings) end
+        end
+    end
+
+    -- ---------- Xóa script (unload + xóa file đã lưu) ----------
+    local deleteArmed = false
+    local function deleteScriptAction(btn)
+        if not deleteArmed then
+            deleteArmed = true
+            btn.Text = "Click again to confirm"
+            task.delay(3, function()
+                deleteArmed = false
+                if btn and btn.Parent then btn.Text = "Delete Script" end
+            end)
+            return
+        end
+        deleteArmed = false
+
+        task.spawn(function()
+            unloadHub()
+            task.wait(0.8) -- chờ lần lưu cấu hình dở dang (nếu có) xong rồi mới xóa
+
+            pcall(function()
+                if delfile and isfile and isfile(UI_FILE) then delfile(UI_FILE) end
+            end)
+            pcall(function()
+                if delfolder and isfolder and isfolder("Rivals-Skinchanger") then delfolder("Rivals-Skinchanger") end
+            end)
+            pcall(function()
+                if listfiles and delfile then
+                    for _, path in ipairs(listfiles("")) do
+                        local name = string.match(path, "([^/\\]+)$") or path
+                        if string.match(name, "^tex_%d+_%d+%.asset$") then
+                            pcall(delfile, path)
+                        end
+                    end
+                end
+            end)
+        end)
+    end
+
+    -- ---------- Danh sách module ----------
+    local Layout = {
+        {name = "Combat", modules = {
+            {name = "Silent Aim", key = "SilentAim", settings = {
+                {type = "slider", name = "FOV", key = "FOV", min = 50, max = 500},
+                {type = "slider", name = "Aim Offset", key = "AimOffset", min = -10, max = 10},
+                {type = "slider", name = "Max Distance", key = "MaxDistance", min = 100, max = 2000},
+            }},
+            {name = "Aimbot", key = "Aimbot", settings = {
+                {type = "toggle", name = "Hold RMB", key = "HoldRMB"},
+                {type = "toggle", name = "Wall Check", key = "WallCheck"},
+                {type = "slider", name = "FOV", key = "AimbotFOV", min = 30, max = 500},
+                {type = "slider", name = "Smoothness", key = "AimbotSmooth", min = 1, max = 100},
+            }},
+            {name = "Trigger Bot", key = "TriggerBot", settings = {
+                {type = "slider", name = "Delay (ms)", key = "TriggerDelay", min = 0, max = 300},
+            }},
+            {name = "Team Check", key = "TeamCheck"},
+        }},
+        {name = "Render", modules = {
+            {name = "ESP", key = "ESP", settings = {
+                {type = "toggle", name = "Skeleton", key = "ShowSkeleton"},
+                {type = "toggle", name = "Tracers", key = "ShowTracer"},
+                {type = "toggle", name = "Head Dot", key = "ShowHeadDot"},
+                {type = "toggle", name = "Info Text", key = "ShowInfo"},
+                {type = "slider", name = "Max Distance", key = "MaxDistance", min = 100, max = 2000},
+            }},
+            {name = "Chams", key = "Chams"},
+            {name = "Fullbright", key = "Fullbright"},
+            {name = "Camera FOV", key = "FOVChanger", settings = {
+                {type = "slider", name = "FOV", key = "CameraFOV", min = 40, max = 120},
+            }},
+            {name = "Third Person", key = "ThirdPerson", settings = {
+                {type = "slider", name = "Distance", key = "TPDistance", min = 2, max = 50},
+            }},
+            {name = "Skin Changer", key = "SkinChanger"},
+            {name = "Texture Pack", key = "TexturePack"},
+            {name = "Map Darkener", key = "MapDarkener", settings = {
+                {type = "slider", name = "Darkness", key = "Darkness", min = 1, max = 10},
+            }},
+            {name = "Sky Changer", key = "SkyChanger", settings = {
+                {type = "cycle", name = "Preset", key = "SkyPreset", options = SKY_PRESETS},
+                {type = "slider", name = "Time (h)", key = "SkyTime", min = 0, max = 24},
+                {type = "slider", name = "Stars", key = "SkyStars", min = 0, max = 5000},
+                {type = "slider", name = "Density %", key = "SkyDensity", min = 0, max = 100},
+                {type = "toggle", name = "Rainbow Sky", key = "SkyRainbow"},
+            }},
+        }},
+        {name = "Movement", modules = {
+            {name = "Speed", key = "Speed", settings = {
+                {type = "slider", name = "Walk Speed", key = "SpeedValue", min = 16, max = 200},
+            }},
+            {name = "Jump Power", key = "JumpHack", settings = {
+                {type = "slider", name = "Jump Value", key = "JumpValue", min = 50, max = 300},
+            }},
+            {name = "Infinite Jump", key = "InfJump"},
+            {name = "Noclip", key = "Noclip"},
+            {name = "Fly", key = "Fly", settings = {
+                {type = "slider", name = "Fly Speed", key = "FlySpeed", min = 10, max = 200},
+            }},
+            {name = "Target Strafe", key = "TargetStrafe", settings = {
+                {type = "slider", name = "Search Range", key = "StrafeRange", min = 50, max = 2000},
+                {type = "slider", name = "Radius", key = "StrafeRadius", min = 3, max = 30},
+                {type = "slider", name = "Orbit Speed", key = "StrafeSpeed", min = 1, max = 20},
+                {type = "slider", name = "Y Factor", key = "StrafeY", min = -10, max = 10},
+                {type = "toggle", name = "Face Target", key = "StrafeFace"},
+            }},
+            {name = "Anti Aim", key = "AntiAim", settings = {
+                {type = "cycle", name = "Mode", key = "AntiAimMode", options = ANTIAIM_MODES},
+                {type = "slider", name = "Spin Speed", key = "AntiAimSpeed", min = 1, max = 100},
+            }},
+        }},
+        {name = "Player", modules = {
+            {name = "Anti AFK", key = "AntiAFK"},
+            {name = "FPS Boost", key = "FPSBoost"},
+            {name = "Show FPS", key = "ShowFPS"},
+        }},
+        {name = "Other", modules = {
+            {name = "Interface", settings = {
+                {type = "cycle", name = "Panel Style", key = "PanelStyle", options = PANEL_STYLES},
+                {type = "cycle", name = "Theme", key = "ThemeIndex", options = THEMES},
+                {type = "cycle", name = "Background", key = "BgIndex", options = BACKGROUNDS},
+                {type = "slider", name = "Panel Size %", key = "PanelScale", min = 70, max = 150},
+                {type = "slider", name = "Transparency %", key = "PanelTransparency", min = 0, max = 60},
+                {type = "slider", name = "Corner Radius", key = "PanelCorner", min = 0, max = 20},
+                {type = "button", name = "Reset Layout", action = function() relayout() end},
+                {type = "button", name = "Reset Style", action = function()
+                    for key, value in pairs(UI_DEFAULTS) do setFeature(key, value) end
+                    relayout()
+                end},
+            }},
+            {name = "Execute MC Texture", action = function(btn) runMcTexture(btn) end},
+            {name = "Unload Khang Hub", color = Color3.fromRGB(255, 120, 120), action = function() unloadHub() end},
+            {name = "Delete Script", color = Color3.fromRGB(255, 70, 70), action = function(btn) deleteScriptAction(btn) end},
+        }},
+    }
+
+    -- ---------- Dựng panel ----------
+    local PANEL_W, GAP = 180, 16
+
+    relayout = function()
+        local scale = Features.PanelScale / 100
+        local totalW = #panels * PANEL_W * scale + (#panels - 1) * GAP
+        local startX = math.max(10, (Camera.ViewportSize.X - totalW) / 2)
+        for _, p in ipairs(panels) do
+            p.frame.Position = UDim2.new(0, startX + (p.index - 1) * (PANEL_W * scale + GAP), 0, 100)
+        end
+    end
+
+    for i, cat in ipairs(Layout) do
+        local Panel = new("Frame", {
+            Name = cat.name,
+            Position = UDim2.new(0, 0, 0, 100),
+            Size = UDim2.new(0, PANEL_W, 0, 0),
+            AutomaticSize = Enum.AutomaticSize.Y,
+            BackgroundColor3 = COLORS.panel,
+            BackgroundTransparency = Features.PanelTransparency / 100,
+            BorderSizePixel = 0,
+        }, ClickGui)
+        track(Panel, "BackgroundColor3", "panel")
+        local PanelCorner = new("UICorner", {CornerRadius = UDim.new(0, Features.PanelCorner)}, Panel)
+        local PanelScale = new("UIScale", {Scale = Features.PanelScale / 100}, Panel)
+        table.insert(panels, {frame = Panel, corner = PanelCorner, scale = PanelScale, index = i})
+        new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2)}, Panel)
+        new("UIPadding", {PaddingBottom = UDim.new(0, 8)}, Panel)
+
+        local Header = new("TextButton", {
+            Size = UDim2.new(1, 0, 0, 36),
+            BackgroundTransparency = 1,
+            Text = cat.name,
+            TextColor3 = COLORS.text,
+            TextSize = 15,
+            Font = Enum.Font.GothamMedium,
+            AutoButtonColor = false,
+            LayoutOrder = 0,
+        }, Panel)
+
+        Header.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                local dragStart, startPos = input.Position, Panel.Position
+                activeDrag = function(moveInput)
+                    local delta = moveInput.Position - dragStart
+                    Panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                end
+            end
+        end)
+
+        for order, mod in ipairs(cat.modules) do
+            createModule(Panel, mod, order)
+        end
+    end
+
+    relayout()
+    updateMenus()
+
+    setPanelStyle = function(index)
+        setFeature("PanelStyle", index)
+    end
+    runDeleteScript = function(btn)
+        deleteScriptAction(btn)
+    end
+    cycleSkyPreset = function()
+        local nextIndex = (Features.SkyPreset % #SKY_PRESETS) + 1
+        setFeature("SkyPreset", nextIndex)
+        return SKY_PRESETS[nextIndex].name
+    end
+
+    -- ---------- Phím tắt ----------
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if khangUnloaded then return end
+
+        if listening then
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                local mod = listening
+                listening = nil
+                if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Backspace then
+                    mod.bind = nil
+                    mod.bindButton.Text = "Bind: None"
+                elseif input.KeyCode ~= Enum.KeyCode.RightShift then
+                    mod.bind = input.KeyCode
+                    mod.bindButton.Text = "Bind: " .. input.KeyCode.Name
+                else
+                    mod.bindButton.Text = mod.bind and ("Bind: " .. mod.bind.Name) or "Bind: None"
+                end
+            end
+            return
+        end
+
+        if gameProcessed then return end
+
+        if input.KeyCode == Enum.KeyCode.RightShift then
+            menuOpen = not (ClickGui.Visible or MainFrame.Visible)
+            updateMenus()
+            return
+        end
+
+        for _, mod in ipairs(allModules) do
+            if mod.bind and input.KeyCode == mod.bind then
+                triggerModule(mod)
+            end
+        end
+    end)
+end
