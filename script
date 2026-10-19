@@ -36,7 +36,7 @@ lightningLayer.ZIndex = 1
 
 -- Rayos: zigzag sólido que caen hasta abajo
 local function spawnLightning()
-    local segments = math.random(8,11)
+    local segments = math.random(5,7)
     local x = math.random(15,85)/100
     local y = -0.25
     local lastX = x
@@ -187,7 +187,7 @@ end)
 task.spawn(function()
     while gui.Parent and not closed do
         spawnLightning()
-        task.wait(math.random(12,20)/100)
+        task.wait(math.random(30,45)/100)
     end
 end)
 
@@ -235,7 +235,47 @@ end
 closeSplash()
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+-- RunService có bọc nhẹ để đo thời gian callback (bật "Perf Log" trong menu để xem; tắt thì gần như không tốn gì)
+local RunService
+do
+    local real = game:GetService("RunService")
+    local PERF = {enabled = false, stats = {}}
+
+    local function wrapSignal(signal)
+        return {
+            Connect = function(_, fn)
+                local label = tostring(debug.info(fn, "l") or "?")
+                return signal:Connect(function(...)
+                    if not PERF.enabled then return fn(...) end
+                    local t0 = os.clock()
+                    fn(...)
+                    local elapsed = os.clock() - t0
+                    local st = PERF.stats[label]
+                    if not st then
+                        st = {total = 0, count = 0, max = 0}
+                        PERF.stats[label] = st
+                    end
+                    st.total += elapsed
+                    st.count += 1
+                    if elapsed > st.max then st.max = elapsed end
+                end)
+            end,
+        }
+    end
+
+    RunService = setmetatable({}, {
+        __index = function(_, key)
+            if key == "KhangPerf" then return PERF end
+            local value = real[key]
+            if key == "RenderStepped" or key == "Heartbeat" or key == "Stepped" then
+                return wrapSignal(value)
+            elseif type(value) == "function" then
+                return function(_, ...) return value(real, ...) end
+            end
+            return value
+        end,
+    })
+end
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
@@ -300,6 +340,14 @@ local Features = {
     SkyRainbow = false,
     PanelStyle = 1,
     SkinDebug = false,
+    UseCustomLoadout = true,
+    UnlockAll = true,
+    UnlockSkin = true,
+    UnlockWrap = true,
+    UnlockCharm = true,
+    UnlockFinisher = true,
+    UnlockEmote = true,
+    UnlockRarity = 1,
     EmotePlay = false,
     EmoteIndex = 1,
     EmoteCustomId = "",
@@ -351,10 +399,24 @@ local Features = {
     RageHeadOnly = true,
     RageWallCheck = true,
     RageSnap = false,
-    RageAntiAim = false
+    RageAntiAim = false,
+    LowLag = true,
+    ESPRate = 40,
+    ScanRate = 30,
+    SkyQuality = 1,
+    PerfLog = false,
+    AimLock = false,
+    LockHold = true,
+    LockPart = 1,
+    LockFOV = 200,
+    LockRange = 1000,
+    LockSmooth = 0,
+    LockPredict = 0,
+    LockWall = true
 }
 
 -- Khai báo trước để nút trong menu gọi được
+local showNotification
 local enableBoost, disableBoost
 local enableTexturePack, disableTexturePack, enableDarkener, disableDarkener, setDarkness, runMcTexture, unloadHub
 local enableSky, disableSky, setPanelStyle, cycleSkyPreset
@@ -364,6 +426,16 @@ local Custom = {}
 Custom.AIM_PARTS = {{name = "Head"}, {name = "Torso"}, {name = "Root"}, {name = "Random"}}
 Custom.SILENT_MODES = {{name = "Raycast"}, {name = "Mouse"}, {name = "Both"}, {name = "Camera"}}
 Custom.RAGE_PRIORITY = {{name = "Closest"}, {name = "Lowest HP"}, {name = "Crosshair"}}
+Custom.QUALITY = {{name = "Low"}, {name = "Medium"}, {name = "High"}}
+Custom.rarityOptions = {{name = "All"}} -- được điền tự động từ CosmeticLibrary khi Skin Changer khởi động
+Custom.rerollCosmetics = function()
+    if Custom.skinReroll then
+        local n = Custom.skinReroll()
+        showNotification("Cosmetics", "Đã reroll " .. n .. " mục", 4)
+    else
+        showNotification("Cosmetics", "Hãy bật Skin Changer trước", 4)
+    end
+end
 
 -- Keybinds storage
 local Keybinds = {
@@ -468,12 +540,41 @@ local function InitSkinChanger()
         return false
     end
 
+    local function loadoutOn()
+        return Features.SkinChanger and Features.UseCustomLoadout
+    end
+
+    local function cosmeticKind(c)
+        if isFinisher(c) then return "Finisher" end
+        if isEmote(c) then return "Emote" end
+        local t = type(c.Type) == "string" and c.Type:lower() or ""
+        if t:find("skin") then return "Skin" end
+        if t:find("wrap") then return "Wrap" end
+        if t:find("charm") then return "Charm" end
+        return "Other"
+    end
+
+    local UNLOCK_FLAG = {Skin = "UnlockSkin", Wrap = "UnlockWrap", Charm = "UnlockCharm", Finisher = "UnlockFinisher", Emote = "UnlockEmote"}
+
+    -- Cosmetic này có được mở khoá theo cài đặt "Unlock All" (loại + độ hiếm) không
+    local function allowed(c)
+        if type(c) ~= "table" or not Features.UnlockAll then return false end
+        local flag = UNLOCK_FLAG[cosmeticKind(c)]
+        if flag and not Features[flag] then return false end
+        local idx = Features.UnlockRarity
+        if idx > 1 then
+            local option = Custom.rarityOptions[idx]
+            if option and tostring(c.Rarity) ~= option.name then return false end
+        end
+        return true
+    end
+
     local origOwnsCosmetic = CosmeticLibrary.OwnsCosmetic
     CosmeticLibrary.OwnsCosmetic = function(self, inventory, name, weapon)
         if not Features.SkinChanger then return origOwnsCosmetic(self, inventory, name, weapon) end
         if name:find("MISSING_") then return origOwnsCosmetic(self, inventory, name, weapon) end
         local cosmetic = CosmeticLibrary.Cosmetics[name]
-        if cosmetic then return true end
+        if cosmetic and allowed(cosmetic) then return true end
         return origOwnsCosmetic(self, inventory, name, weapon)
     end
 
@@ -489,7 +590,7 @@ local function InitSkinChanger()
             end end
             return setmetatable(proxy, {__index = function(t, k)
                 local cosmetic = CosmeticLibrary.Cosmetics[k]
-                if cosmetic then return true end
+                if cosmetic and allowed(cosmetic) then return true end
                 return nil
             end})
         end
@@ -511,7 +612,7 @@ local function InitSkinChanger()
     DataController.GetWeaponData = function(self, weaponName)
         local data = originalGetWeaponData(self, weaponName)
         if not data then return nil end
-        if not Features.SkinChanger then return data end
+        if not loadoutOn() then return data end
         local merged = {}
         for key, value in pairs(data) do merged[key] = value end
         merged.Name = weaponName
@@ -624,7 +725,7 @@ local function InitSkinChanger()
     if ClientItem and ClientItem._CreateViewModel then
         local originalCreateViewModel = ClientItem._CreateViewModel
         ClientItem._CreateViewModel = function(self, viewmodelRef)
-            if not Features.SkinChanger then return originalCreateViewModel(self, viewmodelRef) end
+            if not loadoutOn() then return originalCreateViewModel(self, viewmodelRef) end
             local weaponName = self.Name
             local weaponPlayer = self.ClientFighter and self.ClientFighter.Player
             constructingWeapon = (weaponPlayer == player) and weaponName or nil
@@ -649,7 +750,7 @@ local function InitSkinChanger()
         local ClientViewModel = require(viewModelModule)
         local originalNew = ClientViewModel.new
         ClientViewModel.new = function(replicatedData, clientItem)
-            if not Features.SkinChanger then return originalNew(replicatedData, clientItem) end
+            if not loadoutOn() then return originalNew(replicatedData, clientItem) end
             local weaponPlayer = clientItem.ClientFighter and clientItem.ClientFighter.Player
             local weaponName = constructingWeapon or clientItem.Name
             if weaponPlayer == player and equipped[weaponName] then
@@ -673,7 +774,7 @@ local function InitSkinChanger()
             ClientViewModel.GetCharm = function(self)
                 local weaponName = self.ClientItem and self.ClientItem.Name
                 local weaponPlayer = self.ClientItem and self.ClientItem.ClientFighter and self.ClientItem.ClientFighter.Player
-                if Features.SkinChanger and weaponName and weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Charm then
+                if loadoutOn() and weaponName and weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Charm then
                     return equipped[weaponName].Charm
                 end
                 return originalGetCharmFunc(self)
@@ -684,7 +785,7 @@ local function InitSkinChanger()
             ClientViewModel.GetWrap = function(self)
                 local weaponName = self.ClientItem and self.ClientItem.Name
                 local weaponPlayer = self.ClientItem and self.ClientItem.ClientFighter and self.ClientItem.ClientFighter.Player
-                if Features.SkinChanger and weaponName and weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Wrap then
+                if loadoutOn() and weaponName and weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Wrap then
                     return equipped[weaponName].Wrap
                 end
                 return originalGetWrapFunc(self)
@@ -694,7 +795,7 @@ local function InitSkinChanger()
 
     local originalGetViewModelImage = ItemLibrary.GetViewModelImageFromWeaponData
     ItemLibrary.GetViewModelImageFromWeaponData = function(self, weaponData, highRes)
-        if not Features.SkinChanger or not weaponData then return originalGetViewModelImage(self, weaponData, highRes) end
+        if not loadoutOn() or not weaponData then return originalGetViewModelImage(self, weaponData, highRes) end
         local weaponName = weaponData.Name
         local shouldShowSkin = (weaponData.Skin and equipped[weaponName] and weaponData.Skin == equipped[weaponName].Skin) or (viewingProfile == player and equipped[weaponName] and equipped[weaponName].Skin)
         if shouldShowSkin and equipped[weaponName] and equipped[weaponName].Skin then
@@ -776,6 +877,44 @@ local function InitSkinChanger()
         return applied, missing
     end
 
+    -- Reroll: đổi ngẫu nhiên Skin/Wrap/Charm đang trang bị sang món cùng loại (cùng vũ khí nếu có thông tin)
+    Custom.skinReroll = function()
+        local pools = {}
+        for name, c in pairs(CosmeticLibrary.Cosmetics) do
+            if type(c) == "table" and not tostring(name):find("MISSING_") and allowed(c) then
+                local kind = cosmeticKind(c)
+                if kind == "Skin" or kind == "Wrap" or kind == "Charm" then
+                    pools[kind] = pools[kind] or {}
+                    table.insert(pools[kind], name)
+                end
+            end
+        end
+        local changed = 0
+        for weapon, cosmetics in pairs(equipped) do
+            if weapon ~= "Dances" then
+                for cType, old in pairs(cosmetics) do
+                    local pool = pools[cType]
+                    if pool and old then
+                        local oldWeapon = old.Weapon or old.WeaponName
+                        local candidates = {}
+                        for _, name in ipairs(pool) do
+                            local c = CosmeticLibrary.Cosmetics[name]
+                            local w = c.Weapon or c.WeaponName
+                            if oldWeapon == nil or w == nil or w == oldWeapon then candidates[#candidates + 1] = name end
+                        end
+                        if #candidates > 0 then
+                            local cloned = cloneCosmetic(candidates[math.random(#candidates)], cType, {inverted = old.Inverted})
+                            if cloned then cosmetics[cType] = cloned changed += 1 end
+                        end
+                    end
+                end
+            end
+        end
+        pcall(function() DataController.CurrentData:Replicate("WeaponInventory") end)
+        saveConfig()
+        return changed
+    end
+
     -- Ghi toàn bộ tên cosmetic ra file để biết đúng tên khi tự làm pack
     Custom.skinDump = function()
         local lines = {}
@@ -802,20 +941,22 @@ local function InitSkinChanger()
         return #lines
     end
 
+    -- Danh sách độ hiếm lấy từ chính dữ liệu game
+    do
+        local set, names = {}, {}
+        for _, c in pairs(CosmeticLibrary.Cosmetics) do
+            if type(c) == "table" and c.Rarity ~= nil then set[tostring(c.Rarity)] = true end
+        end
+        for r in pairs(set) do names[#names + 1] = r end
+        table.sort(names)
+        for i = #Custom.rarityOptions, 2, -1 do table.remove(Custom.rarityOptions, i) end
+        for _, r in ipairs(names) do table.insert(Custom.rarityOptions, {name = r}) end
+        if Features.UnlockRarity > #Custom.rarityOptions then Features.UnlockRarity = 1 end
+        if Custom.syncUI then Custom.syncUI() end
+    end
+
     loadConfig()
 end
-
--- Cài hook sớm (giống script skin gốc) để UI emote/finisher của game đọc dữ liệu đã qua hook.
--- Hook chỉ có tác dụng khi bật Skin Changer.
-task.spawn(function()
-    if not skinInitialized then
-        skinInitialized = true
-        local ok, err = pcall(InitSkinChanger)
-        if not ok then
-            warn("[Khang Hub] Skin Changer error: " .. tostring(err))
-        end
-    end
-end)
 
 -- Crear ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
@@ -1253,6 +1394,18 @@ CreateToggle("Skin Changer", "SkinChanger", false, function(state)
 end)
 
 CreateToggle("Skin Debug Log (F9)", "SkinDebug", false)
+CreateToggle("Use Custom Loadout", "UseCustomLoadout", true)
+CreateButton("Reroll Random Cosmetics", function() Custom.rerollCosmetics() end)
+CreateToggle("Unlock All Cosmetics", "UnlockAll", true)
+CreateToggle("Unlock: Skins", "UnlockSkin", true)
+CreateToggle("Unlock: Wraps", "UnlockWrap", true)
+CreateToggle("Unlock: Charms", "UnlockCharm", true)
+CreateToggle("Unlock: Finishers", "UnlockFinisher", true)
+CreateToggle("Unlock: Emotes", "UnlockEmote", true)
+CreateButton("Rarity: All (bấm để đổi)", function(btn)
+    Features.UnlockRarity = (Features.UnlockRarity % #Custom.rarityOptions) + 1
+    btn.Text = "Rarity: " .. Custom.rarityOptions[Features.UnlockRarity].name
+end)
 
 -- Sección: PLAYER
 local PlayerSection = Instance.new("TextLabel")
@@ -1523,6 +1676,19 @@ CreateToggle("Silent Wall Check", "SilentWallCheck", true)
 CreateToggle("Silent AutoFire", "SilentAutoFire", false)
 CreateToggle("Silent Debug Log (F9)", "SilentDebug", false)
 
+CreateSection("AIM LOCK")
+CreateToggle("Aim Lock", "AimLock", false)
+CreateToggle("Lock: Hold Right Click", "LockHold", true)
+CreateButton("Lock Part: " .. Custom.AIM_PARTS[1].name .. " (bấm để đổi)", function(btn)
+    Features.LockPart = (Features.LockPart % #Custom.AIM_PARTS) + 1
+    btn.Text = "Lock Part: " .. Custom.AIM_PARTS[Features.LockPart].name
+end)
+CreateSlider("Lock FOV", 30, 800, 200, function(value) Features.LockFOV = value end, "LockFOV")
+CreateSlider("Lock Range", 50, 3000, 1000, function(value) Features.LockRange = value end, "LockRange")
+CreateSlider("Lock Smoothness (0 = cứng)", 0, 100, 0, function(value) Features.LockSmooth = value end, "LockSmooth")
+CreateSlider("Lock Prediction (ms)", 0, 100, 0, function(value) Features.LockPredict = value end, "LockPredict")
+CreateToggle("Lock Wall Check", "LockWall", true)
+
 CreateSection("RAGE BOT")
 CreateToggle("Rage Bot", "RageBot", false)
 CreateButton("Rage Priority: Closest (bấm để đổi)", function(btn)
@@ -1561,6 +1727,20 @@ CreateSlider("Exposure", -30, 30, 0, function(value)
     Features.SkyExposure = value
 end, "SkyExposure")
 CreateToggle("Matrix Rain", "SkyMatrix", false)
+
+CreateSection("GIẢM LAG")
+CreateToggle("Low Lag Mode", "LowLag", true)
+CreateSlider("ESP Rate (Hz)", 10, 144, 40, function(value)
+    Features.ESPRate = value
+end, "ESPRate")
+CreateSlider("Scan Rate (Hz)", 10, 144, 30, function(value)
+    Features.ScanRate = value
+end, "ScanRate")
+CreateButton("Shader Quality: Low (bấm để đổi)", function(btn)
+    Features.SkyQuality = (Features.SkyQuality % #Custom.QUALITY) + 1
+    btn.Text = "Shader Quality: " .. Custom.QUALITY[Features.SkyQuality].name
+end)
+CreateToggle("Perf Log (F9)", "PerfLog", false)
 
 -- Sección: PERFORMANCE
 local PerfSection = Instance.new("TextLabel")
@@ -2121,6 +2301,8 @@ do
     local autoClickTimer = 0
     local rageTimer = 0
     local fovShown, aimCircleShown, debugTimer = false, false, 0
+    local scanTimer, aimCache = 0, nil
+    local lockTarget = nil
 
     local function getTriggerTarget()
         local char = LocalPlayer.Character
@@ -2138,6 +2320,12 @@ do
 
     RunService.RenderStepped:Connect(function(dt)
         local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+        -- Chỉ quét tìm mục tiêu theo ScanRate (Low Lag Mode: tối đa 20Hz); vị trí vẫn cập nhật mỗi frame
+        scanTimer += dt
+        local scanRate = Features.LowLag and math.min(Features.ScanRate, 20) or Features.ScanRate
+        local scanDue = scanTimer >= 1 / math.max(scanRate, 1)
+        if scanDue then scanTimer = 0 end
 
         -- Vòng FOV (chỉ ghi Drawing khi đang hiện hoặc vừa đổi trạng thái)
         if Features.SilentAim then
@@ -2171,7 +2359,7 @@ do
             end
         end
 
-        -- Aim Assist (kéo camera, có độ dính)
+        -- Aim Assist (kéo camera, có độ dính) - tìm mục tiêu theo ScanRate, camera vẫn mượt mỗi frame
         local aimTarget = nil
         if Features.Aimbot then
             local holding = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
@@ -2179,9 +2367,13 @@ do
                 if not aimLockPlayer then
                     aimLockKind = pickKind(Features.AimPart, Features.AimPart == 4 and 50 or 100)
                 end
-                local target = findTarget(Features.MaxDistance, Features.AimbotFOV, Features.WallCheck, aimLockKind,
-                    aimLockPlayer, Features.AimbotFOV * (1 + Features.AimbotSticky / 50))
-                if target then
+                if scanDue or not aimCache then
+                    aimCache = findTarget(Features.MaxDistance, Features.AimbotFOV, Features.WallCheck, aimLockKind,
+                        aimLockPlayer, Features.AimbotFOV * (1 + Features.AimbotSticky / 50))
+                end
+                local target = aimCache
+                if target and target.part.Parent then
+                    target.position = target.part.Position + Vector3.new(0, Features.AimOffset, 0)
                     aimLockPlayer = target.player
                     aimTarget = target
                     local goal = CFrame.new(Camera.CFrame.Position, target.position)
@@ -2189,21 +2381,63 @@ do
                     local factor = base + (1 - base) * (Features.AimbotSticky / 100) * 0.5
                     Camera.CFrame = Camera.CFrame:Lerp(goal, factor)
                 else
-                    aimLockPlayer = nil
+                    aimCache, aimLockPlayer = nil, nil
                 end
             else
-                aimLockPlayer = nil
+                aimCache, aimLockPlayer = nil, nil
             end
         else
-            aimLockPlayer = nil
+            aimCache, aimLockPlayer = nil, nil
+        end
+
+        -- Aim Lock: khóa cứng camera vào mục tiêu tới khi nhả phím / mục tiêu chết / ra khỏi tầm
+        if Features.AimLock and (not Features.LockHold or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)) then
+            local t = lockTarget
+            if t then
+                local alive = t.hum and t.hum.Health > 0 and t.part.Parent and t.player.Parent
+                if alive and scanDue then
+                    alive = (t.part.Position - Camera.CFrame.Position).Magnitude <= Features.LockRange
+                        and (not Features.LockWall or isVisible(t.part, t.character))
+                end
+                if not alive then t = nil end
+            end
+            if not t and scanDue then
+                t = findTarget(Features.LockRange, Features.LockFOV, Features.LockWall,
+                    pickKind(Features.LockPart, Features.LockPart == 4 and 50 or 100), nil, nil)
+                if t then t.hum = t.character:FindFirstChildOfClass("Humanoid") end
+            end
+            lockTarget = t
+            if t then
+                local pos = t.part.Position + Vector3.new(0, Features.AimOffset, 0)
+                if Features.LockPredict > 0 then
+                    pos += t.part.AssemblyLinearVelocity * (Features.LockPredict / 1000)
+                end
+                local goal = CFrame.new(Camera.CFrame.Position, pos)
+                if Features.LockSmooth <= 0 then
+                    Camera.CFrame = goal
+                else
+                    Camera.CFrame = Camera.CFrame:Lerp(goal, math.clamp(1 - Features.LockSmooth / 101, 0.02, 1))
+                end
+                t.position = pos
+                aimTarget = t
+            end
+        else
+            lockTarget = nil
         end
 
         -- Silent Aim
         if Features.SilentAim or Features.RageBot then ensureSilentHooks() end
         if Features.RageBot then
-            silentTarget = findRageTarget()
+            if scanDue or not silentTarget then silentTarget = findRageTarget() end
         else
-            updateSilentTarget()
+            if scanDue or not silentTarget then updateSilentTarget() end
+        end
+        if silentTarget then
+            if silentTarget.part.Parent then
+                silentTarget.position = silentTarget.part.Position
+            else
+                silentTarget = nil
+            end
         end
         setAutoFire(Features.SilentAim and not Features.RageBot and Features.SilentAutoFire and silentTarget ~= nil)
 
@@ -2391,133 +2625,207 @@ end
 
 Players.PlayerAdded:Connect(createESP)
 
+local ESP_RED, ESP_GREEN = Color3.fromRGB(255, 50, 50), Color3.fromRGB(50, 255, 50)
+local espAccum = 0
+
 local function hideESP(data)
     if data.hidden then return end
     data.hidden = true
     data.skeletonHidden = true
+    data.vis = {}
     for _, obj in pairs(data.objects) do obj.Visible = false end
 end
 
-RunService.RenderStepped:Connect(function()
-    -- Tắt ESP: ẩn một lần rồi thoát, không đụng tới Drawing mỗi frame nữa
+-- Chỉ ghi vào Drawing khi giá trị thật sự đổi (mỗi lần ghi Drawing rất tốn)
+local function espVis(data, obj, value)
+    local vis = data.vis
+    if vis[obj] ~= value then
+        vis[obj] = value
+        obj.Visible = value
+    end
+end
+
+local function espColor(data, obj, color)
+    local colors = data.colors
+    if colors[obj] ~= color then
+        colors[obj] = color
+        obj.Color = color
+    end
+end
+
+-- Cache các bộ phận của nhân vật, làm mới 2 giây/lần (tránh FindFirstChild mỗi frame)
+local function getEspParts(data, character, now)
+    if data.partChar ~= character or now >= (data.partUntil or 0) then
+        data.partChar = character
+        data.partUntil = now + 2
+        local parts = {}
+        for _, conn in ipairs(bodyConnections) do
+            parts[conn[1]] = character:FindFirstChild(conn[1])
+            parts[conn[2]] = character:FindFirstChild(conn[2])
+        end
+        parts.Head = character:FindFirstChild("Head")
+        parts.HumanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+        parts.Humanoid = character:FindFirstChildOfClass("Humanoid")
+        data.parts = parts
+    end
+    return data.parts
+end
+
+local projP, projOn = {}, {}
+local function proj(part)
+    local p = projP[part]
+    if p == nil then
+        local v, on = Camera:WorldToViewportPoint(part.Position)
+        projP[part], projOn[part] = v, on
+        return v, on
+    end
+    return p, projOn[part]
+end
+
+RunService.RenderStepped:Connect(function(dt)
+    -- ESP tắt: ẩn một lần rồi thoát
     if not Features.ESP then
         for _, data in pairs(espObjects) do hideESP(data) end
+        espAccum = 0
         return
     end
 
+    -- Giới hạn tốc độ cập nhật ESP (Low Lag Mode: tối đa 30Hz)
+    espAccum += dt
+    local rate = Features.LowLag and math.min(Features.ESPRate, 30) or Features.ESPRate
+    if espAccum < 1 / math.max(rate, 1) then return end
+    espAccum = 0
+
+    local now = os.clock()
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local showSkeleton = Features.ShowSkeleton and not Features.LowLag
+    local viewport = Camera.ViewportSize
+    local tracerFrom = Vector2.new(viewport.X / 2, viewport.Y)
+
     for player, data in pairs(espObjects) do
+        data.vis = data.vis or {}
+        data.colors = data.colors or {}
+        table.clear(projP)
+        table.clear(projOn)
+
         local character = player.Character
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        local hrp = character and character:FindFirstChild("HumanoidRootPart")
-        
-        local shouldShow = Features.ESP and myRoot and character and humanoid and humanoid.Health > 0 and hrp
-        
-        if shouldShow then
+        local parts = character and getEspParts(data, character, now)
+        local humanoid = parts and parts.Humanoid
+        local hrp = parts and parts.HumanoidRootPart
+        local shown = false
+
+        if myRoot and humanoid and humanoid.Health > 0 and hrp and hrp.Parent then
             local distance = (hrp.Position - myRoot.Position).Magnitude
             if distance <= Features.MaxDistance then
+                shown = true
                 data.hidden = false
-                local isEnemyPlayer = isEnemy(player)
-                local color = isEnemyPlayer and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(50, 255, 50)
-                local objIndex = 1
-                
-                if Features.ShowSkeleton then
+                local objects = data.objects
+                local color = isEnemy(player) and ESP_RED or ESP_GREEN
+
+                -- Skeleton
+                if showSkeleton then
                     data.skeletonHidden = false
-                    for _, conn in ipairs(bodyConnections) do
-                        local part1 = character:FindFirstChild(conn[1])
-                        local part2 = character:FindFirstChild(conn[2])
-                        local line = data.objects[objIndex]
-                        
-                        if part1 and part2 and line then
-                            local p1, onScreen1 = Camera:WorldToViewportPoint(part1.Position)
-                            local p2, onScreen2 = Camera:WorldToViewportPoint(part2.Position)
-                            
-                            if onScreen1 or onScreen2 then
+                    for i, conn in ipairs(bodyConnections) do
+                        local line = objects[i]
+                        local part1, part2 = parts[conn[1]], parts[conn[2]]
+                        if part1 and part2 then
+                            local p1, on1 = proj(part1)
+                            local p2, on2 = proj(part2)
+                            if on1 or on2 then
                                 line.From = Vector2.new(p1.X, p1.Y)
                                 line.To = Vector2.new(p2.X, p2.Y)
-                                line.Color = color
-                                line.Visible = true
+                                espColor(data, line, color)
+                                espVis(data, line, true)
                             else
-                                line.Visible = false
+                                espVis(data, line, false)
                             end
-                        elseif line then
-                            line.Visible = false
+                        else
+                            espVis(data, line, false)
                         end
-                        objIndex = objIndex + 1
+                    end
+                elseif not data.skeletonHidden then
+                    data.skeletonHidden = true
+                    for i = 1, 14 do espVis(data, objects[i], false) end
+                end
+
+                local head = parts.Head
+
+                -- Head dot
+                local headCircle = objects[15]
+                if Features.ShowHeadDot and head then
+                    local hp, onScreen = proj(head)
+                    if onScreen then
+                        headCircle.Position = Vector2.new(hp.X, hp.Y)
+                        espColor(data, headCircle, color)
+                        espVis(data, headCircle, true)
+                    else
+                        espVis(data, headCircle, false)
                     end
                 else
-                    if not data.skeletonHidden then
-                        data.skeletonHidden = true
-                        for i = 1, 14 do
-                            if data.objects[i] then data.objects[i].Visible = false end
+                    espVis(data, headCircle, false)
+                end
+
+                -- Tracer
+                local tracer = objects[16]
+                if Features.ShowTracer then
+                    local rp, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                    if onScreen then
+                        tracer.From = tracerFrom
+                        tracer.To = Vector2.new(rp.X, rp.Y)
+                        espColor(data, tracer, color)
+                        espVis(data, tracer, true)
+                    else
+                        espVis(data, tracer, false)
+                    end
+                else
+                    espVis(data, tracer, false)
+                end
+
+                -- Info
+                local infoText = objects[17]
+                if Features.ShowInfo and head then
+                    local ip, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.2, 0))
+                    if onScreen then
+                        infoText.Position = Vector2.new(ip.X, ip.Y)
+                        local text = string.format("%s [%d%%] (%dm)", player.Name, math.floor(humanoid.Health), math.floor(distance))
+                        if data.infoText ~= text then
+                            data.infoText = text
+                            infoText.Text = text
                         end
-                    end
-                    objIndex = 15
-                end
-                
-                local head = character:FindFirstChild("Head")
-                local headCircle = data.objects[15]
-                if Features.ShowHeadDot and head and headCircle then
-                    local headPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                    if onScreen then
-                        headCircle.Position = Vector2.new(headPos.X, headPos.Y)
-                        headCircle.Color = color
-                        headCircle.Visible = true
+                        espColor(data, infoText, color)
+                        espVis(data, infoText, true)
                     else
-                        headCircle.Visible = false
+                        espVis(data, infoText, false)
                     end
-                elseif headCircle then
-                    headCircle.Visible = false
+                else
+                    espVis(data, infoText, false)
                 end
-                
-                local tracer = data.objects[16]
-                if Features.ShowTracer and tracer then
-                    local hrpPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                    if onScreen then
-                        tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                        tracer.To = Vector2.new(hrpPos.X, hrpPos.Y)
-                        tracer.Color = color
-                        tracer.Visible = true
-                    else
-                        tracer.Visible = false
-                    end
-                elseif tracer then
-                    tracer.Visible = false
-                end
-                
-                local infoText = data.objects[17]
-                if Features.ShowInfo and infoText and head then
-                    local headPos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.2, 0))
-                    if onScreen then
-                        infoText.Position = Vector2.new(headPos.X, headPos.Y)
-                        infoText.Text = string.format("%s [%d%%] (%dm)", player.Name, math.floor(humanoid.Health), math.floor(distance))
-                        infoText.Color = color
-                        infoText.Visible = true
-                    else
-                        infoText.Visible = false
-                    end
-                elseif infoText then
-                    infoText.Visible = false
-                end
-            else
-                hideESP(data)
             end
-        else
-            hideESP(data)
         end
+
+        if not shown then hideESP(data) end
     end
 end)
 
 -- ===== PLAYER / VISUAL EXTRAS =====
+local cachedHum, cachedRoot = nil, nil
 local function getHumanoid()
     local c = LocalPlayer.Character
-    return c and c:FindFirstChildOfClass("Humanoid")
+    if not c then return nil end
+    if not cachedHum or cachedHum.Parent ~= c then
+        cachedHum = c:FindFirstChildOfClass("Humanoid")
+    end
+    return cachedHum
 end
 
 local function getRoot()
     local c = LocalPlayer.Character
-    return c and c:FindFirstChild("HumanoidRootPart")
+    if not c then return nil end
+    if not cachedRoot or cachedRoot.Parent ~= c then
+        cachedRoot = c:FindFirstChild("HumanoidRootPart")
+    end
+    return cachedRoot
 end
 
 local savedWalkSpeed, speedActive = 16, false
@@ -2898,9 +3206,13 @@ fpsText.Font = 2
 fpsText.Visible = false
 fpsText.Color = Color3.fromRGB(0, 255, 100)
 local fpsFrames, fpsTime = 0, 0
+local fpsShown = false
 
 RunService.RenderStepped:Connect(function(dt)
-    fpsText.Visible = Features.ShowFPS
+    if (Features.ShowFPS and true or false) ~= fpsShown then
+        fpsShown = Features.ShowFPS and true or false
+        fpsText.Visible = fpsShown
+    end
     if Features.ShowFPS then
         fpsFrames += 1
         fpsTime += dt
@@ -2919,6 +3231,9 @@ end)
 local tpActive, tpSavedMaxZoom, tpSavedMinZoom, tpSavedMode = false, nil, nil, nil
 local tpLastCFrame = nil
 local tpParts, tpRefreshAt, tpPartsChar = {}, 0, nil
+local tpParams = RaycastParams.new()
+tpParams.FilterType = Enum.RaycastFilterType.Exclude
+local tpParamsChar = nil
 
 RunService:BindToRenderStep("KhangThirdPerson", Enum.RenderPriority.Camera.Value + 1, function()
     if not Features.ThirdPerson then
@@ -2970,10 +3285,11 @@ RunService:BindToRenderStep("KhangThirdPerson", Enum.RenderPriority.Camera.Value
 
     local desired = cf * CFrame.new(0, 0, Features.TPDistance)
     local dir = desired.Position - cf.Position
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = {char}
-    local hit = Workspace:Raycast(cf.Position, dir, params)
+    if tpParamsChar ~= char then
+        tpParamsChar = char
+        tpParams.FilterDescendantsInstances = {char}
+    end
+    local hit = Workspace:Raycast(cf.Position, dir, tpParams)
     local pos = hit and (hit.Position - dir.Unit * 0.5) or desired.Position
 
     local newCF = CFrame.new(pos) * (cf - cf.Position)
@@ -2995,7 +3311,7 @@ local function batchProcess(items, callback, batchSize)
     end)
 end
 
-local function showNotification(titleText, bodyText, duration)
+function showNotification(titleText, bodyText, duration)
     if khangUnloaded then return end
     duration = duration or 5
 
@@ -3478,9 +3794,11 @@ Features.SkyRainbow = false
 do
     local field = Custom.skyField
     local skyActive = false
+    local lastSkySig = nil
     local skyBackup, storedObjects = nil, {}
     local inst = {}
     local rainPart = nil
+    local rainEmitter = nil
 
     local function make(class, name, parent)
         local obj = Instance.new(class)
@@ -3520,6 +3838,7 @@ do
             NumberSequenceKeypoint.new(1, 1),
         })
         emitter.Parent = rainPart
+        rainEmitter = emitter
         rainPart.Parent = Workspace
     end
 
@@ -3527,6 +3846,7 @@ do
         if rainPart then
             rainPart:Destroy()
             rainPart = nil
+            rainEmitter = nil
         end
     end
 
@@ -3534,6 +3854,8 @@ do
         local preset = SKY_PRESETS[Features.SkyPreset] or SKY_PRESETS[1]
         local rainbow = Features.SkyRainbow
         local hue = (tick() % 6) / 6
+        -- Chất lượng shader: 1 = nhẹ (không mây/tia nắng/DoF), 2 = có mây, 3 = đầy đủ. Low Lag Mode ép về 1.
+        local quality = Features.LowLag and 1 or Features.SkyQuality
 
         Lighting.ClockTime = Features.SkyTime
         Lighting.ColorShift_Top = rainbow and Color3.fromHSV(hue, 0.6, 1) or preset.top
@@ -3550,7 +3872,7 @@ do
         atmo.Color = rainbow and Color3.fromHSV(hue, 0.55, 1) or preset.atmoColor
 
         local clouds = inst.clouds
-        clouds.Enabled = Features.SkyClouds > 0
+        clouds.Enabled = quality >= 2 and Features.SkyClouds > 0
         clouds.Cover = Features.SkyClouds / 100
         clouds.Density = 0.6
         clouds.Color = rainbow and Color3.fromHSV((hue + 0.3) % 1, 0.35, 1) or field(preset, "cloudColor")
@@ -3567,13 +3889,13 @@ do
         cc.TintColor = field(preset, "tint")
 
         local rays = inst.rays
-        rays.Enabled = Features.SkySunRays > 0
+        rays.Enabled = quality >= 3 and Features.SkySunRays > 0
         rays.Intensity = Features.SkySunRays / 100 * 0.5
         rays.Spread = 0.8
 
         local dofAmount = field(preset, "dof")
         local dof = inst.dof
-        dof.Enabled = dofAmount > 0
+        dof.Enabled = quality >= 3 and dofAmount > 0
         dof.FarIntensity = dofAmount
         dof.FocusDistance = 60
         dof.InFocusRadius = 80
@@ -3581,6 +3903,7 @@ do
 
         if Features.SkyMatrix then
             ensureRain()
+            if rainEmitter then rainEmitter.Rate = quality == 1 and 250 or (quality == 2 and 500 or 900) end
             rainPart.CFrame = CFrame.new(Camera.CFrame.Position + Vector3.new(0, 110, 0))
         else
             removeRain()
@@ -3624,6 +3947,7 @@ do
         inst.rays = make("SunRaysEffect", "KhangRays", Lighting)
         inst.dof = make("DepthOfFieldEffect", "KhangDof", Lighting)
 
+        lastSkySig = nil
         pcall(applySky)
     end
 
@@ -3662,7 +3986,15 @@ do
         skyTimer += dt
         if Features.SkyRainbow or skyTimer >= 0.25 then
             skyTimer = 0
-            pcall(applySky)
+            local sig = table.concat({
+                Features.SkyPreset, Features.SkyTime, Features.SkyStars, Features.SkyDensity, Features.SkyClouds,
+                Features.SkyBloom, Features.SkySunRays, Features.SkySaturation, Features.SkyContrast,
+                Features.SkyExposure, tostring(Features.SkyMatrix), tostring(Features.LowLag), Features.SkyQuality,
+            }, ",")
+            if Features.SkyRainbow or sig ~= lastSkySig then
+                lastSkySig = sig
+                pcall(applySky)
+            end
         end
     end)
 
@@ -4910,6 +5242,15 @@ do
                 {type = "toggle", name = "AutoFire", key = "SilentAutoFire"},
                 {type = "toggle", name = "Debug Log (F9)", key = "SilentDebug"},
             }},
+            {name = "Aim Lock", key = "AimLock", settings = {
+                {type = "cycle", name = "Part", key = "LockPart", options = Custom.AIM_PARTS},
+                {type = "slider", name = "FOV", key = "LockFOV", min = 30, max = 800},
+                {type = "slider", name = "Range", key = "LockRange", min = 50, max = 3000},
+                {type = "slider", name = "Smoothness (0 = cứng)", key = "LockSmooth", min = 0, max = 100},
+                {type = "slider", name = "Prediction (ms)", key = "LockPredict", min = 0, max = 100},
+                {type = "toggle", name = "Hold Right Click", key = "LockHold"},
+                {type = "toggle", name = "Wall Check", key = "LockWall"},
+            }},
             {name = "Rage Bot", key = "RageBot", settings = {
                 {type = "cycle", name = "Priority", key = "RagePriority", options = Custom.RAGE_PRIORITY},
                 {type = "slider", name = "Range", key = "RageRange", min = 50, max = 3000},
@@ -4938,22 +5279,6 @@ do
             {name = "Third Person", key = "ThirdPerson", settings = {
                 {type = "slider", name = "Distance", key = "TPDistance", min = 2, max = 50},
             }},
-            {name = "Skin Changer", key = "SkinChanger", settings = {
-                {type = "toggle", name = "Debug Log (F9)", key = "SkinDebug"},
-            }},
-            {name = "Skin Packs", settings = {
-                {type = "cycle", name = "Pack", key = "SkinPackIndex", options = Custom.packOptions},
-                {type = "button", name = "Apply Pack", action = function() Custom.applyPack() end},
-                {type = "textbox", name = "New Pack Name", key = "SkinPackName", placeholder = "My Pack"},
-                {type = "button", name = "Save Current As Pack", action = function() Custom.savePack() end},
-                {type = "button", name = "Export Pack (copy)", action = function() Custom.exportPack() end},
-                {type = "textbox", name = "Import String", key = "SkinPackImport", placeholder = "KHANGPACK1:..."},
-                {type = "button", name = "Import Pack", action = function() Custom.importPackFromTextbox() end},
-                {type = "button", name = "Import From File", action = function() Custom.importPackFromFile() end},
-                {type = "button", name = "Delete Pack", action = function() Custom.deletePack() end},
-                {type = "toggle", name = "Auto Apply On Start", key = "SkinPackAuto"},
-                {type = "button", name = "Dump Cosmetic Names", action = function() Custom.dumpCosmetics() end},
-            }},
             {name = "Texture Pack", key = "TexturePack"},
             {name = "Map Darkener", key = "MapDarkener", settings = {
                 {type = "slider", name = "Darkness", key = "Darkness", min = 1, max = 10},
@@ -4971,6 +5296,33 @@ do
                 {type = "slider", name = "Exposure", key = "SkyExposure", min = -30, max = 30},
                 {type = "toggle", name = "Matrix Rain", key = "SkyMatrix"},
                 {type = "toggle", name = "Rainbow Sky", key = "SkyRainbow"},
+            }},
+        }},
+        {name = "Cosmetics", modules = {
+            {name = "Cosmetic Changes", key = "SkinChanger", settings = {
+                {type = "toggle", name = "Use Custom Loadout", key = "UseCustomLoadout"},
+                {type = "button", name = "Reroll Random Cosmetics", action = function() Custom.rerollCosmetics() end},
+                {type = "toggle", name = "Unlock All Cosmetics", key = "UnlockAll"},
+                {type = "toggle", name = "Unlock Skins", key = "UnlockSkin"},
+                {type = "toggle", name = "Unlock Wraps", key = "UnlockWrap"},
+                {type = "toggle", name = "Unlock Charms", key = "UnlockCharm"},
+                {type = "toggle", name = "Unlock Finishers", key = "UnlockFinisher"},
+                {type = "toggle", name = "Unlock Emotes", key = "UnlockEmote"},
+                {type = "cycle", name = "Rarity", key = "UnlockRarity", options = Custom.rarityOptions},
+                {type = "toggle", name = "Debug Log (F9)", key = "SkinDebug"},
+            }},
+            {name = "Skin Packs", settings = {
+                {type = "cycle", name = "Pack", key = "SkinPackIndex", options = Custom.packOptions},
+                {type = "button", name = "Apply Pack", action = function() Custom.applyPack() end},
+                {type = "textbox", name = "New Pack Name", key = "SkinPackName", placeholder = "My Pack"},
+                {type = "button", name = "Save Current As Pack", action = function() Custom.savePack() end},
+                {type = "button", name = "Export Pack (copy)", action = function() Custom.exportPack() end},
+                {type = "textbox", name = "Import String", key = "SkinPackImport", placeholder = "KHANGPACK1:..."},
+                {type = "button", name = "Import Pack", action = function() Custom.importPackFromTextbox() end},
+                {type = "button", name = "Import From File", action = function() Custom.importPackFromFile() end},
+                {type = "button", name = "Delete Pack", action = function() Custom.deletePack() end},
+                {type = "toggle", name = "Auto Apply On Start", key = "SkinPackAuto"},
+                {type = "button", name = "Dump Cosmetic Names", action = function() Custom.dumpCosmetics() end},
             }},
         }},
         {name = "Movement", modules = {
@@ -5001,6 +5353,13 @@ do
             {name = "Anti AFK", key = "AntiAFK"},
             {name = "FPS Boost", key = "FPSBoost"},
             {name = "Show FPS", key = "ShowFPS"},
+            {name = "Performance", settings = {
+                {type = "toggle", name = "Low Lag Mode", key = "LowLag"},
+                {type = "slider", name = "ESP Rate (Hz)", key = "ESPRate", min = 10, max = 144},
+                {type = "slider", name = "Scan Rate (Hz)", key = "ScanRate", min = 10, max = 144},
+                {type = "cycle", name = "Shader Quality", key = "SkyQuality", options = Custom.QUALITY},
+                {type = "toggle", name = "Perf Log (F9)", key = "PerfLog"},
+            }},
             {name = "Custom Emote", key = "EmotePlay", settings = {
                 {type = "cycle", name = "Emote", key = "EmoteIndex", options = Custom.EMOTES},
                 {type = "textbox", name = "Custom Anim ID", key = "EmoteCustomId", placeholder = "Animation ID"},
@@ -5255,7 +5614,7 @@ do
     local SKIP = {
         ThemeIndex = true, BgIndex = true, PanelScale = true, PanelTransparency = true,
         PanelCorner = true, PanelStyle = true, EmotePlay = true,
-        SkinPackIndex = true, SkinPackName = true, SkinPackImport = true,
+        SkinPackIndex = true, SkinPackName = true, SkinPackImport = true, PerfLog = true,
     }
     local lastSaved = nil
 
@@ -5326,6 +5685,13 @@ do
         pcall(Features.MapDarkener and enableDarkener or disableDarkener)
         pcall(Features.SkyChanger and enableSky or disableSky)
 
+        if Features.SkinChanger and not skinInitialized then
+            skinInitialized = true
+            task.spawn(function()
+                local ok, err = pcall(InitSkinChanger)
+                if not ok then warn("[Khang Hub] Skin Changer error: " .. tostring(err)) end
+            end)
+        end
         if Custom.refreshPackOptions then Custom.refreshPackOptions() end
         if Custom.syncUI then Custom.syncUI() end
         lastSaved = encodeSnapshot()
@@ -5414,7 +5780,7 @@ do
 
     task.spawn(function()
         while not khangUnloaded do
-            task.wait(3)
+            task.wait(5)
             if Features.ConfigAutoSave and not khangUnloaded then
                 Custom.saveConfig(false)
             end
@@ -5449,6 +5815,36 @@ task.spawn(function()
         end
         if Custom.isSkyActive then
             reconcile(Features.SkyChanger and true or false, Custom.isSkyActive(), enableSky, disableSky)
+        end
+    end
+end)
+
+-- ===== PROFILER (Perf Log) =====
+-- Bật "Perf Log (F9)" trong menu: mỗi 3 giây console in ra các callback tốn thời gian nhất (kèm số dòng code).
+task.spawn(function()
+    local perf = RunService.KhangPerf
+    local ticks = 0
+    while not khangUnloaded do
+        task.wait(1)
+        perf.enabled = Features.PerfLog and true or false
+        if perf.enabled then
+            ticks += 1
+            if ticks >= 3 then
+                ticks = 0
+                local rows = {}
+                for label, st in pairs(perf.stats) do
+                    rows[#rows + 1] = {label = label, total = st.total * 1000, avg = st.total / st.count * 1000, max = st.max * 1000, calls = st.count}
+                end
+                perf.stats = {}
+                table.sort(rows, function(a, b) return a.total > b.total end)
+                print("[Khang Perf] callback tốn nhiều nhất trong 3 giây (dòng code | tổng ms | trung bình ms | max ms | số lần)")
+                for i = 1, math.min(8, #rows) do
+                    local row = rows[i]
+                    print(string.format("  dòng %s | %.1f | %.3f | %.2f | %d", row.label, row.total, row.avg, row.max, row.calls))
+                end
+            end
+        else
+            ticks = 0
         end
     end
 end)
