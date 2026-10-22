@@ -9,230 +9,177 @@ local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
 
-pcall(function()
-    CoreGui:FindFirstChild("KHANG_SPLASH"):Destroy()
-end)
-
--- BLUR
-local blur = Instance.new("BlurEffect", Lighting)
-blur.Size = 0
-TweenService:Create(blur, TweenInfo.new(0.5), {Size = 18}):Play()
-
--- GUI
-local gui = Instance.new("ScreenGui", CoreGui)
-gui.Name = "KHANG_SPLASH"
-gui.IgnoreGuiInset = true
-gui.ResetOnSpawn = false
-
-local bg = Instance.new("Frame", gui)
-bg.Size = UDim2.new(1,0,1,0)
-bg.BackgroundColor3 = Color3.fromRGB(5,6,10)
-
--- LIGHTNING LAYER (FONDO)
-local lightningLayer = Instance.new("Frame", bg)
-lightningLayer.Size = UDim2.new(1,0,1,0)
-lightningLayer.BackgroundTransparency = 1
-lightningLayer.ZIndex = 1
-
--- Rayos: zigzag sólido que caen hasta abajo
-local function spawnLightning()
-    local segments = math.random(5,7)
-    local x = math.random(15,85)/100
-    local y = -0.25
-    local lastX = x
-
-    for _ = 1, segments do
-        local segHeight = math.random(60,90)
-        local seg = Instance.new("Frame", lightningLayer)
-        seg.AnchorPoint = Vector2.new(0.5,0)
-        seg.Position = UDim2.new(lastX,0,y,0)
-        seg.Size = UDim2.new(0,4,0,segHeight)
-        seg.Rotation = math.random(-20,20)
-        seg.BackgroundColor3 = Color3.fromRGB(120,240,255)
-        seg.BorderSizePixel = 0
-        seg.ZIndex = 1
-
-        local glow = Instance.new("UIStroke", seg)
-        glow.Thickness = 3
-        glow.Color = Color3.fromRGB(120,255,255)
-        glow.Transparency = 0
-
-        local offset = math.random(-25,25)/1000
-        lastX += offset
-        y += segHeight / math.max(1, (game:GetService("Workspace").CurrentCamera and game:GetService("Workspace").CurrentCamera.ViewportSize.Y) or 720)
-
-        TweenService:Create(seg, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
-        task.delay(0.3, function() if seg and seg.Parent then seg:Destroy() end end)
-    end
-end
-
--- TITULOS
-local title = Instance.new("TextLabel", bg)
-title.Size = UDim2.new(0,400,0,70)
-title.Position = UDim2.new(0.5,-200,0.42,-60)
-title.BackgroundTransparency = 1
-title.Text = "KHANG"
-title.Font = Enum.Font.GothamBlack
-title.TextSize = 54
-title.TextColor3 = Color3.fromRGB(200,255,255)
-title.ZIndex = 2
-
-local sub = Instance.new("TextLabel", bg)
-sub.Size = UDim2.new(0,400,0,30)
-sub.Position = UDim2.new(0.5,-200,0.42,5)
-sub.BackgroundTransparency = 1
-sub.Text = "hub"
-sub.Font = Enum.Font.Gotham
-sub.TextSize = 18
-sub.TextColor3 = Color3.fromRGB(160,220,220)
-sub.ZIndex = 2
-
--- FLOAT ANIMATION PARA TEXTOS
+-- ===== LOADING SCREEN (phong cách Kicia, có nút SKIP, chạy song song nên không làm chậm script) =====
 task.spawn(function()
-    while title.Parent do
-        TweenService:Create(title, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-            {Position = title.Position + UDim2.new(0,0,0,-8)}):Play()
-        TweenService:Create(sub, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-            {Position = sub.Position + UDim2.new(0,0,0,-8)}):Play()
-        task.wait(2)
-        TweenService:Create(title, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-            {Position = title.Position + UDim2.new(0,0,0,8)}):Play()
-        TweenService:Create(sub, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-            {Position = sub.Position + UDim2.new(0,0,0,8)}):Play()
-        task.wait(2)
-    end
-end)
-
--- LOADING BAR (ABAJO)
-local barBG = Instance.new("Frame", bg)
-barBG.Size = UDim2.new(0,460,0,12)
-barBG.Position = UDim2.new(0.5,-230,0.72,0)
-barBG.BackgroundColor3 = Color3.fromRGB(30,40,50)
-barBG.BorderSizePixel = 0
-barBG.ZIndex = 2
-barBG.ClipsDescendants = true
-Instance.new("UICorner", barBG)
-
-local barFill = Instance.new("Frame", barBG)
-barFill.Size = UDim2.new(0,0,1,0)
-barFill.BackgroundColor3 = Color3.fromRGB(55,95,140)
-barFill.BorderSizePixel = 0
-Instance.new("UICorner", barFill)
-
-local shimmer = Instance.new("Frame", barBG)
-shimmer.Size = UDim2.new(0.25,0,1,0)
-shimmer.Position = UDim2.new(-0.25,0,0,0)
-shimmer.BackgroundColor3 = Color3.fromRGB(150,255,255)
-shimmer.BorderSizePixel = 0
-Instance.new("UICorner", shimmer)
-shimmer.ZIndex = 3
-
-local percent = Instance.new("TextLabel", bg)
-percent.Size = UDim2.new(0,200,0,20)
-percent.Position = UDim2.new(0.5,-100,0.76,0)
-percent.BackgroundTransparency = 1
-percent.Text = "0%"
-percent.Font = Enum.Font.Gotham
-percent.TextSize = 14
-percent.TextColor3 = Color3.fromRGB(150,150,200)
-percent.ZIndex = 2
-
-local skip = Instance.new("TextButton", bg)
-skip.Size = UDim2.new(0,90,0,32)
-skip.Position = UDim2.new(1,-110,1,-50)
-skip.Text = "SKIP"
-skip.Font = Enum.Font.GothamBold
-skip.TextSize = 14
-skip.TextColor3 = Color3.new(1,1,1)
-skip.BackgroundColor3 = Color3.fromRGB(60,60,60)
-skip.BorderSizePixel = 0
-skip.ZIndex = 4
-Instance.new("UICorner", skip)
-
-local closed = false
-local function closeSplash()
-    if closed then return end
-    closed = true
-    TweenService:Create(blur, TweenInfo.new(0.35), {Size = 0}):Play()
-    for _, v in pairs(bg:GetDescendants()) do
-        if v:IsA("TextLabel") or v:IsA("TextButton") then
-            pcall(function() TweenService:Create(v, TweenInfo.new(0.25), {TextTransparency = 1}):Play() end)
-        elseif v:IsA("Frame") then
-            pcall(function() TweenService:Create(v, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play() end)
+    local TEAL = Color3.fromRGB(120, 205, 222)
+    local parent = CoreGui
+    pcall(function() if gethui then parent = gethui() or CoreGui end end)
+    pcall(function()
+        for _, p in ipairs({parent, CoreGui}) do
+            local old = p:FindFirstChild("KHANG_SPLASH")
+            if old then old:Destroy() end
         end
+    end)
+
+    local blur = Instance.new("BlurEffect")
+    blur.Size = 0
+    blur.Parent = Lighting
+    TweenService:Create(blur, TweenInfo.new(0.4), {Size = 14}):Play()
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "KHANG_SPLASH"
+    gui.IgnoreGuiInset = true
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = 1000
+    gui.Parent = parent
+
+    local bg = Instance.new("Frame", gui)
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    bg.BackgroundTransparency = 0.1
+    bg.BorderSizePixel = 0
+
+    local card = Instance.new("Frame", bg)
+    card.AnchorPoint = Vector2.new(0.5, 0.5)
+    card.Position = UDim2.new(0.5, 0, 0.5, 0)
+    card.Size = UDim2.new(0, 420, 0, 230)
+    card.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
+    card.BorderSizePixel = 0
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 14)
+    local cardStroke = Instance.new("UIStroke", card)
+    cardStroke.Color = Color3.fromRGB(40, 40, 46)
+    cardStroke.Thickness = 1
+
+    local logo = Instance.new("TextLabel", card)
+    logo.AnchorPoint = Vector2.new(0.5, 0)
+    logo.Position = UDim2.new(0.5, 0, 0, 22)
+    logo.Size = UDim2.new(0, 56, 0, 56)
+    logo.BackgroundColor3 = Color3.fromRGB(14, 14, 16)
+    logo.Text = "K"
+    logo.Font = Enum.Font.GothamBlack
+    logo.TextSize = 32
+    logo.TextColor3 = TEAL
+    Instance.new("UICorner", logo).CornerRadius = UDim.new(0, 14)
+    local logoStroke = Instance.new("UIStroke", logo)
+    logoStroke.Color = TEAL
+    logoStroke.Thickness = 2
+
+    local title = Instance.new("TextLabel", card)
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Position = UDim2.new(0, 0, 0, 90)
+    title.BackgroundTransparency = 1
+    title.Text = "KHANG HUB"
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 24
+    title.TextColor3 = Color3.fromRGB(240, 240, 244)
+
+    local status = Instance.new("TextLabel", card)
+    status.Size = UDim2.new(1, 0, 0, 18)
+    status.Position = UDim2.new(0, 0, 0, 122)
+    status.BackgroundTransparency = 1
+    status.Text = "Initializing..."
+    status.Font = Enum.Font.Gotham
+    status.TextSize = 13
+    status.TextColor3 = Color3.fromRGB(150, 150, 160)
+
+    local barBg = Instance.new("Frame", card)
+    barBg.AnchorPoint = Vector2.new(0.5, 0)
+    barBg.Position = UDim2.new(0.5, 0, 0, 160)
+    barBg.Size = UDim2.new(0, 340, 0, 4)
+    barBg.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+    barBg.BorderSizePixel = 0
+    Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
+
+    local fill = Instance.new("Frame", barBg)
+    fill.Size = UDim2.new(0, 0, 1, 0)
+    fill.BackgroundColor3 = TEAL
+    fill.BorderSizePixel = 0
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+    local percent = Instance.new("TextLabel", card)
+    percent.Size = UDim2.new(1, 0, 0, 16)
+    percent.Position = UDim2.new(0, 0, 0, 172)
+    percent.BackgroundTransparency = 1
+    percent.Text = "0%"
+    percent.Font = Enum.Font.GothamMedium
+    percent.TextSize = 12
+    percent.TextColor3 = TEAL
+
+    local hint = Instance.new("TextLabel", card)
+    hint.Size = UDim2.new(1, 0, 0, 16)
+    hint.Position = UDim2.new(0, 0, 1, -26)
+    hint.BackgroundTransparency = 1
+    hint.Text = "RightShift: ẩn / hiện menu"
+    hint.Font = Enum.Font.Gotham
+    hint.TextSize = 11
+    hint.TextColor3 = Color3.fromRGB(100, 100, 110)
+
+    local skip = Instance.new("TextButton", bg)
+    skip.AnchorPoint = Vector2.new(1, 1)
+    skip.Position = UDim2.new(1, -24, 1, -24)
+    skip.Size = UDim2.new(0, 96, 0, 34)
+    skip.BackgroundColor3 = Color3.fromRGB(14, 14, 16)
+    skip.Text = "SKIP  ›"
+    skip.Font = Enum.Font.GothamBold
+    skip.TextSize = 13
+    skip.TextColor3 = TEAL
+    skip.AutoButtonColor = true
+    Instance.new("UICorner", skip).CornerRadius = UDim.new(0, 8)
+    local skipStroke = Instance.new("UIStroke", skip)
+    skipStroke.Color = TEAL
+    skipStroke.Thickness = 1
+
+    local closed = false
+    local function close()
+        if closed then return end
+        closed = true
+        TweenService:Create(blur, TweenInfo.new(0.3), {Size = 0}):Play()
+        local info = TweenInfo.new(0.3)
+        for _, obj in ipairs(gui:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+                    TweenService:Create(obj, info, {TextTransparency = 1, BackgroundTransparency = 1}):Play()
+                elseif obj:IsA("Frame") then
+                    TweenService:Create(obj, info, {BackgroundTransparency = 1}):Play()
+                elseif obj:IsA("UIStroke") then
+                    TweenService:Create(obj, info, {Transparency = 1}):Play()
+                end
+            end)
+        end
+        task.wait(0.35)
+        pcall(function() blur:Destroy() end)
+        pcall(function() gui:Destroy() end)
     end
-    task.wait(0.36)
-    if blur and blur.Parent then blur:Destroy() end
-    if gui and gui.Parent then gui:Destroy() end
-end
+    skip.MouseButton1Click:Connect(close)
 
-skip.MouseButton1Click:Connect(closeSplash)
-
--- ANIMACION DEL SHIMMER
-local shimmerTweenTime = 1.1
-local shimmerTweenInfo = TweenInfo.new(shimmerTweenTime, Enum.EasingStyle.Linear)
-
-task.spawn(function()
-    while shimmer.Parent and not closed do
-        shimmer.Position = UDim2.new(-shimmer.Size.X.Scale, 0, 0, 0)
-        local targetPos = UDim2.new(1, 0, 0, 0)
-        local tw = TweenService:Create(shimmer, shimmerTweenInfo, {Position = targetPos})
-        tw:Play()
-        pcall(function() tw.Completed:Wait() end)
-        task.wait(0.05)
+    local steps = {
+        {0, "Initializing core..."},
+        {22, "Loading combat engine..."},
+        {46, "Preparing cosmetics..."},
+        {70, "Building interface..."},
+        {92, "Finalizing..."},
+    }
+    local t0, duration = os.clock(), 2.6
+    while not closed do
+        local a = (os.clock() - t0) / duration
+        if a >= 1 then break end
+        local p = a * a * (3 - 2 * a)
+        local pct = math.floor(p * 100)
+        fill.Size = UDim2.new(p, 0, 1, 0)
+        percent.Text = pct .. "%"
+        for _, step in ipairs(steps) do
+            if pct >= step[1] then status.Text = step[2] end
+        end
+        task.wait()
+    end
+    if not closed then
+        fill.Size = UDim2.new(1, 0, 1, 0)
+        percent.Text = "100%"
+        status.Text = "Ready"
+        task.wait(0.15)
+        close()
     end
 end)
-
--- RAYOS LOOP
-task.spawn(function()
-    while gui.Parent and not closed do
-        spawnLightning()
-        task.wait(math.random(30,45)/100)
-    end
-end)
-
--- CARGA
-for i = 1, 100 do
-    if closed then break end
-    local scale = i / 100
-    barFill.Size = UDim2.new(scale, 0, 1, 0)
-    percent.Text = tostring(i) .. "%"
-    task.wait(0.035)
-end
-
-if not closed then
-    local function miniExplosionAt(xScale)
-        local circ = Instance.new("Frame", bg)
-        circ.AnchorPoint = Vector2.new(0.5, 1)
-        circ.Position = UDim2.new(xScale, 0, 1, -18)
-        circ.Size = UDim2.new(0,12,0,12)
-        circ.BackgroundColor3 = Color3.fromRGB(140,255,255)
-        circ.BorderSizePixel = 0
-        local uic = Instance.new("UICorner", circ)
-        uic.CornerRadius = UDim.new(1,0)
-
-        TweenService:Create(circ, TweenInfo.new(0.35, Enum.EasingStyle.Quad), {
-            Size = UDim2.new(0,140,0,140),
-            BackgroundTransparency = 1,
-            Position = UDim2.new(xScale, 0, 1, -70)
-        }):Play()
-
-        task.delay(0.36, function()
-            if circ and circ.Parent then circ:Destroy() end
-        end)
-    end
-
-    local n = 4
-    for k = 1, n do
-        local x = 0.5 - 230/460 + ( (k-1) * (460/(n-1)) ) / 460
-        x = math.clamp(x, 0.05, 0.95)
-        miniExplosionAt(x)
-        task.wait(0.14)
-    end
-    task.wait(0.45)
-end
-
-closeSplash()
 
 local Players = game:GetService("Players")
 -- RunService có bọc nhẹ để đo thời gian callback (bật "Perf Log" trong menu để xem; tắt thì gần như không tốn gì)
@@ -345,8 +292,6 @@ local Features = {
     UnlockSkin = true,
     UnlockWrap = true,
     UnlockCharm = true,
-    UnlockFinisher = true,
-    UnlockEmote = true,
     UnlockRarity = 1,
     EmotePlay = false,
     EmoteIndex = 1,
@@ -412,7 +357,38 @@ local Features = {
     LockRange = 1000,
     LockSmooth = 0,
     LockPredict = 0,
-    LockWall = true
+    LockWall = true,
+    ShowHealthBar = false,
+    ShowTargetInfo = false,
+    TargetHPMax = 100,
+    SilentHook = 1,            -- 1 = hook hàm Raycast (nhẹ, an toàn), 2 = hook __namecall toàn game
+    RageNeedMouseLock = true,  -- Rage Bot chỉ snap/bắn khi chuột đang khóa giữa màn hình (trong trận)
+
+    -- Texture Pack: bật/tắt từng nhóm
+    TexUI = true,
+    TexRanks = true,
+    TexKillSounds = true,
+    TexMatchSounds = true,
+    TexMoveSounds = true,
+    TexMenuSounds = true,
+    TexOtherSounds = true,
+
+    -- Map Texture
+    MapTexture = false,
+    MapTextureSource = "",
+    MapMaterialIndex = 1,
+
+    -- Âm thanh Dash / Double Jump (tự nhận diện qua chuyển động nhân vật)
+    DashSound = false,
+    DashSoundIndex = 2,
+    DashSoundCustom = "",
+    DashVolume = 60,
+    DashSens = 30,
+    DoubleJumpSound = false,
+    DoubleJumpSoundIndex = 4,
+    DoubleJumpSoundCustom = "",
+    DJVolume = 60,
+    DJSens = 18
 }
 
 -- Khai báo trước để nút trong menu gọi được
@@ -427,11 +403,40 @@ Custom.AIM_PARTS = {{name = "Head"}, {name = "Torso"}, {name = "Root"}, {name = 
 Custom.SILENT_MODES = {{name = "Raycast"}, {name = "Mouse"}, {name = "Both"}, {name = "Camera"}}
 Custom.RAGE_PRIORITY = {{name = "Closest"}, {name = "Lowest HP"}, {name = "Crosshair"}}
 Custom.QUALITY = {{name = "Low"}, {name = "Medium"}, {name = "High"}}
+Custom.HOOK_MODES = {{name = "Function (nhẹ)"}, {name = "Namecall"}}
+do
+    local B = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/"
+    Custom.SOUND_PRESETS = {
+        {name = "Off"},
+        {name = "Sliding", url = B .. "Sliding.mp3"},
+        {name = "Menu Click", url = B .. "menuclick.base.ogg"},
+        {name = "Achievement", url = B .. "achievement_3.base.ogg"},
+        {name = "Target", url = B .. "target.base.ogg"},
+        {name = "Bluer", url = B .. "bluer.ogg"},
+        {name = "Kill 1", url = B .. "kill1.ogg"},
+        {name = "Kill 2", url = B .. "kill2.ogg"},
+        {name = "Kill 3", url = B .. "kill3.ogg"},
+        {name = "Lego Build", url = B .. "lego-build.mp3"},
+        {name = "Clear Spin", url = B .. "clearspin.base.ogg"},
+        {name = "Eliminated", url = B .. "elimin.mp3"},
+        {name = "Custom"},
+    }
+    Custom.MAP_MATERIALS = {
+        {name = "Original"}, {name = "SmoothPlastic", mat = "SmoothPlastic"}, {name = "Plastic", mat = "Plastic"},
+        {name = "Brick", mat = "Brick"}, {name = "Concrete", mat = "Concrete"}, {name = "Wood", mat = "Wood"},
+        {name = "Grass", mat = "Grass"}, {name = "Marble", mat = "Marble"}, {name = "Glass", mat = "Glass"},
+        {name = "Neon", mat = "Neon"},
+    }
+end
 Custom.rarityOptions = {{name = "All"}} -- được điền tự động từ CosmeticLibrary khi Skin Changer khởi động
 Custom.rerollCosmetics = function()
     if Custom.skinReroll then
-        local n = Custom.skinReroll()
-        showNotification("Cosmetics", "Đã reroll " .. n .. " mục", 4)
+        local n, mapped = Custom.skinReroll()
+        if not mapped then
+            showNotification("Cosmetics", "Không xác định được súng của skin. Bấm Dump Cosmetic Names rồi gửi file", 6)
+        else
+            showNotification("Cosmetics", "Đã reroll skin cho " .. n .. " súng", 4)
+        end
     else
         showNotification("Cosmetics", "Hãy bật Skin Changer trước", 4)
     end
@@ -554,12 +559,14 @@ local function InitSkinChanger()
         return "Other"
     end
 
-    local UNLOCK_FLAG = {Skin = "UnlockSkin", Wrap = "UnlockWrap", Charm = "UnlockCharm", Finisher = "UnlockFinisher", Emote = "UnlockEmote"}
+    local UNLOCK_FLAG = {Skin = "UnlockSkin", Wrap = "UnlockWrap", Charm = "UnlockCharm"}
 
     -- Cosmetic này có được mở khoá theo cài đặt "Unlock All" (loại + độ hiếm) không
     local function allowed(c)
         if type(c) ~= "table" or not Features.UnlockAll then return false end
-        local flag = UNLOCK_FLAG[cosmeticKind(c)]
+        local kind = cosmeticKind(c)
+        if kind == "Finisher" or kind == "Emote" then return false end -- không mở khoá emote/finisher
+        local flag = UNLOCK_FLAG[kind]
         if flag and not Features[flag] then return false end
         local idx = Features.UnlockRarity
         if idx > 1 then
@@ -682,12 +689,12 @@ local function InitSkinChanger()
                             end
                         end
                         saveConfig()
-                        return oldNamecall(self, ...)
+                        if setnamecallmethod then setnamecallmethod("FireServer") end return oldNamecall(self, ...)
                     end
                     -- Other cosmetics (skins, charms, wraps)
                     if cosmeticName and cosmeticName ~= "None" and cosmeticName ~= "" then
                         local inventory = DataController:Get("CosmeticInventory")
-                        if inventory and rawget(inventory, cosmeticName) then return oldNamecall(self, ...) end
+                        if inventory and rawget(inventory, cosmeticName) then if setnamecallmethod then setnamecallmethod("FireServer") end return oldNamecall(self, ...) end
                     end
                     equipped[weaponName] = equipped[weaponName] or {}
                     if not cosmeticName or cosmeticName == "None" or cosmeticName == "" then
@@ -714,7 +721,7 @@ local function InitSkinChanger()
                     end
                     return
                 end
-                return oldNamecall(self, ...)
+                if setnamecallmethod then setnamecallmethod("FireServer") end return oldNamecall(self, ...)
             end)
         end
     end
@@ -805,29 +812,6 @@ local function InitSkinChanger()
         return originalGetViewModelImage(self, weaponData, highRes)
     end
 
-    pcall(function()
-        local EmoteController = require(controllers:WaitForChild("EmoteController", 10))
-        if EmoteController and EmoteController.GetEmotes then
-            local originalGetEmotes = EmoteController.GetEmotes
-            EmoteController.GetEmotes = function(self)
-                local emotes = originalGetEmotes(self)
-                if not Features.SkinChanger then return emotes end
-                for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
-                    if cosmetic and isEmote(cosmetic) then
-                        if not emotes[name] then
-                            emotes[name] = {
-                                Name = name,
-                                Type = cosmetic.Type,
-                                ObjectID = cosmetic.ObjectID,
-                                Enum = cosmetic.Enum
-                            }
-                        end
-                    end
-                end
-                return emotes
-            end
-        end
-    end)
 
     pcall(function()
         local ViewProfile = require(player.PlayerScripts.Modules.Pages.ViewProfile)
@@ -877,42 +861,96 @@ local function InitSkinChanger()
         return applied, missing
     end
 
-    -- Reroll: đổi ngẫu nhiên Skin/Wrap/Charm đang trang bị sang món cùng loại (cùng vũ khí nếu có thông tin)
+    -- Reroll: mỗi SÚNG nhận ngẫu nhiên 1 skin CỦA CHÍNH SÚNG ĐÓ (không lẫn skin súng khác).
+    -- Wrap / Charm: chỉ lấy loại dùng được cho súng đó (hoặc loại dùng chung nếu game không ghi rõ súng).
+    local WEAPON_FIELDS = {"Weapon", "WeaponName", "Weapons", "Gun", "ForWeapon", "BaseWeapon"}
+
+    local function weaponsOf(name, c)
+        local set = {}
+        local function add(v)
+            if type(v) == "string" and v ~= "" then
+                set[v] = true
+            elseif type(v) == "table" then
+                for _, x in pairs(v) do
+                    if type(x) == "string" then set[x] = true end
+                end
+            end
+        end
+        for _, f in ipairs(WEAPON_FIELDS) do add(c[f]) end
+        if next(set) == nil then
+            local vm = ItemLibrary.ViewModels and ItemLibrary.ViewModels[name]
+            if type(vm) == "table" then
+                for _, f in ipairs(WEAPON_FIELDS) do add(vm[f]) end
+            end
+        end
+        return set
+    end
+
     Custom.skinReroll = function()
-        local pools = {}
+        local skinsByWeapon = {}   -- [súng] = {tên skin...}
+        local universal = {Wrap = {}, Charm = {}}
+        local weaponSpecific = {Wrap = {}, Charm = {}} -- [loại][súng] = {tên...}
+        local weaponSet, mappedAny = {}, false
+
         for name, c in pairs(CosmeticLibrary.Cosmetics) do
             if type(c) == "table" and not tostring(name):find("MISSING_") and allowed(c) then
                 local kind = cosmeticKind(c)
                 if kind == "Skin" or kind == "Wrap" or kind == "Charm" then
-                    pools[kind] = pools[kind] or {}
-                    table.insert(pools[kind], name)
-                end
-            end
-        end
-        local changed = 0
-        for weapon, cosmetics in pairs(equipped) do
-            if weapon ~= "Dances" then
-                for cType, old in pairs(cosmetics) do
-                    local pool = pools[cType]
-                    if pool and old then
-                        local oldWeapon = old.Weapon or old.WeaponName
-                        local candidates = {}
-                        for _, name in ipairs(pool) do
-                            local c = CosmeticLibrary.Cosmetics[name]
-                            local w = c.Weapon or c.WeaponName
-                            if oldWeapon == nil or w == nil or w == oldWeapon then candidates[#candidates + 1] = name end
+                    local weapons = weaponsOf(name, c)
+                    local hasWeapon = next(weapons) ~= nil
+                    if kind == "Skin" then
+                        for w in pairs(weapons) do
+                            skinsByWeapon[w] = skinsByWeapon[w] or {}
+                            table.insert(skinsByWeapon[w], name)
+                            weaponSet[w] = true
+                            mappedAny = true
                         end
-                        if #candidates > 0 then
-                            local cloned = cloneCosmetic(candidates[math.random(#candidates)], cType, {inverted = old.Inverted})
-                            if cloned then cosmetics[cType] = cloned changed += 1 end
+                    elseif hasWeapon then
+                        for w in pairs(weapons) do
+                            weaponSpecific[kind][w] = weaponSpecific[kind][w] or {}
+                            table.insert(weaponSpecific[kind][w], name)
                         end
+                    else
+                        table.insert(universal[kind], name)
                     end
                 end
             end
         end
+
+        if not mappedAny then return 0, false end
+
+        local function pick(list)
+            if list and #list > 0 then return list[math.random(#list)] end
+            return nil
+        end
+
+        local changed = 0
+        for weapon in pairs(weaponSet) do
+            local skin = pick(skinsByWeapon[weapon])
+            if skin then
+                local cloned = cloneCosmetic(skin, "Skin")
+                if cloned then
+                    equipped[weapon] = equipped[weapon] or {}
+                    equipped[weapon].Skin = cloned
+                    -- Wrap / Charm chỉ đổi nếu súng này đang có sẵn (không tự thêm mới)
+                    for _, kind in ipairs({"Wrap", "Charm"}) do
+                        if equipped[weapon][kind] then
+                            local list = weaponSpecific[kind][weapon]
+                            if not list or #list == 0 then list = universal[kind] end
+                            local choice = pick(list)
+                            local c2 = choice and cloneCosmetic(choice, kind)
+                            if c2 then equipped[weapon][kind] = c2 end
+                        end
+                    end
+                    changed += 1
+                    dbg("Reroll", weapon, "->", skin)
+                end
+            end
+        end
+
         pcall(function() DataController.CurrentData:Replicate("WeaponInventory") end)
         saveConfig()
-        return changed
+        return changed, true
     end
 
     -- Ghi toàn bộ tên cosmetic ra file để biết đúng tên khi tự làm pack
@@ -972,7 +1010,7 @@ local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainMenu"
 MainFrame.Size = UDim2.new(0, 320, 0, 480)
 MainFrame.Position = UDim2.new(0, 50, 0, 50)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BackgroundColor3 = Color3.fromRGB(4, 4, 6)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
@@ -999,7 +1037,7 @@ Shadow.Parent = MainFrame
 -- Barra de título
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 40)
-TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+TitleBar.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
 TitleBar.BorderSizePixel = 0
 TitleBar.Parent = MainFrame
 
@@ -1012,7 +1050,7 @@ TitleText.Size = UDim2.new(1, -50, 1, 0)
 TitleText.Position = UDim2.new(0, 15, 0, 0)
 TitleText.BackgroundTransparency = 1
 TitleText.Text = "Khang Hub"
-TitleText.TextColor3 = Color3.fromRGB(0, 170, 255)
+TitleText.TextColor3 = Color3.fromRGB(120, 205, 222)
 TitleText.TextSize = 18
 TitleText.Font = Enum.Font.GothamBold
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -1042,7 +1080,7 @@ ContentFrame.Size = UDim2.new(1, -20, 1, -55)
 ContentFrame.Position = UDim2.new(0, 10, 0, 50)
 ContentFrame.BackgroundTransparency = 1
 ContentFrame.ScrollBarThickness = 4
-ContentFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 170, 255)
+ContentFrame.ScrollBarImageColor3 = Color3.fromRGB(120, 205, 222)
 ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 ContentFrame.Parent = MainFrame
 
@@ -1071,7 +1109,7 @@ local LegacySync = {}
 local function CreateToggle(text, featureKey, default, onChange)
     local Frame = Instance.new("Frame")
     Frame.Size = UDim2.new(1, 0, 0, 45)
-    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    Frame.BackgroundColor3 = Color3.fromRGB(16, 16, 19)
     Frame.BorderSizePixel = 0
     
     local Corner = Instance.new("UICorner")
@@ -1092,7 +1130,7 @@ local function CreateToggle(text, featureKey, default, onChange)
     local KeybindBtn = Instance.new("TextButton")
     KeybindBtn.Size = UDim2.new(0, 50, 0, 28)
     KeybindBtn.Position = UDim2.new(0.52, 0, 0.5, -14)
-    KeybindBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    KeybindBtn.BackgroundColor3 = Color3.fromRGB(38, 38, 44)
     KeybindBtn.Text = "[...]"
     KeybindBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
     KeybindBtn.TextSize = 12
@@ -1106,7 +1144,7 @@ local function CreateToggle(text, featureKey, default, onChange)
     local ToggleBtn = Instance.new("TextButton")
     ToggleBtn.Size = UDim2.new(0, 55, 0, 28)
     ToggleBtn.Position = UDim2.new(1, -65, 0.5, -14)
-    ToggleBtn.BackgroundColor3 = default and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+    ToggleBtn.BackgroundColor3 = default and Color3.fromRGB(120, 205, 222) or Color3.fromRGB(50, 50, 56)
     ToggleBtn.Text = default and "ON" or "OFF"
     ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     ToggleBtn.TextSize = 12
@@ -1129,7 +1167,7 @@ local function CreateToggle(text, featureKey, default, onChange)
         end
         ToggleBtn.Text = state and "ON" or "OFF"
         TweenService:Create(ToggleBtn, TweenInfo.new(0.2), {
-            BackgroundColor3 = state and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+            BackgroundColor3 = state and Color3.fromRGB(120, 205, 222) or Color3.fromRGB(50, 50, 56)
         }):Play()
         
         if onChange then task.spawn(onChange, state) end
@@ -1148,7 +1186,7 @@ local function CreateToggle(text, featureKey, default, onChange)
     table.insert(LegacySync, function()
         state = Features[featureKey] and true or false
         ToggleBtn.Text = state and "ON" or "OFF"
-        ToggleBtn.BackgroundColor3 = state and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+        ToggleBtn.BackgroundColor3 = state and Color3.fromRGB(120, 205, 222) or Color3.fromRGB(50, 50, 56)
     end)
     
     KeybindBtn.MouseButton1Click:Connect(function()
@@ -1156,7 +1194,7 @@ local function CreateToggle(text, featureKey, default, onChange)
         
         listeningForKey = featureKey
         KeybindBtn.Text = "[...]"
-        KeybindBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        KeybindBtn.BackgroundColor3 = Color3.fromRGB(120, 205, 222)
         
         local dots = 0
         local connection
@@ -1174,14 +1212,14 @@ local function CreateToggle(text, featureKey, default, onChange)
                 listeningForKey = nil
                 connection:Disconnect()
                 KeybindBtn.Text = Keybinds[featureKey] and "[" .. Keybinds[featureKey].Name .. "]" or "[...]"
-                KeybindBtn.BackgroundColor3 = Keybinds[featureKey] and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(60, 60, 70)
+                KeybindBtn.BackgroundColor3 = Keybinds[featureKey] and Color3.fromRGB(70, 150, 165) or Color3.fromRGB(38, 38, 44)
             end
         end)
     end)
     
     if Keybinds[featureKey] then
         KeybindBtn.Text = "[" .. Keybinds[featureKey].Name .. "]"
-        KeybindBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+        KeybindBtn.BackgroundColor3 = Color3.fromRGB(70, 150, 165)
     end
     
     Frame.Parent = ContentFrame
@@ -1197,7 +1235,7 @@ end
 local function CreateSlider(text, min, max, default, callback, featureKey)
     local Frame = Instance.new("Frame")
     Frame.Size = UDim2.new(1, 0, 0, 60)
-    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    Frame.BackgroundColor3 = Color3.fromRGB(16, 16, 19)
     
     local Corner = Instance.new("UICorner")
     Corner.CornerRadius = UDim.new(0, 8)
@@ -1217,7 +1255,7 @@ local function CreateSlider(text, min, max, default, callback, featureKey)
     local SliderBg = Instance.new("Frame")
     SliderBg.Size = UDim2.new(1, -24, 0, 10)
     SliderBg.Position = UDim2.new(0, 12, 0, 35)
-    SliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    SliderBg.BackgroundColor3 = Color3.fromRGB(34, 34, 40)
     SliderBg.BorderSizePixel = 0
     SliderBg.Parent = Frame
     
@@ -1227,7 +1265,7 @@ local function CreateSlider(text, min, max, default, callback, featureKey)
     
     local SliderFill = Instance.new("Frame")
     SliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    SliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    SliderFill.BackgroundColor3 = Color3.fromRGB(120, 205, 222)
     SliderFill.BorderSizePixel = 0
     SliderFill.Parent = SliderBg
     
@@ -1279,7 +1317,7 @@ end
 local function CreateButton(text, callback, color)
     local Btn = Instance.new("TextButton")
     Btn.Size = UDim2.new(1, 0, 0, 38)
-    Btn.BackgroundColor3 = color or Color3.fromRGB(35, 35, 40)
+    Btn.BackgroundColor3 = color or Color3.fromRGB(16, 16, 19)
     Btn.BorderSizePixel = 0
     Btn.Text = text
     Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1319,7 +1357,7 @@ local AimSection = Instance.new("TextLabel")
 AimSection.Size = UDim2.new(1, 0, 0, 30)
 AimSection.BackgroundTransparency = 1
 AimSection.Text = "AIMBOT"
-AimSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+AimSection.TextColor3 = Color3.fromRGB(120, 205, 222)
 AimSection.TextSize = 14
 AimSection.Font = Enum.Font.GothamBold
 AimSection.Parent = ContentFrame
@@ -1358,7 +1396,7 @@ local ESPSection = Instance.new("TextLabel")
 ESPSection.Size = UDim2.new(1, 0, 0, 30)
 ESPSection.BackgroundTransparency = 1
 ESPSection.Text = "ESP"
-ESPSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+ESPSection.TextColor3 = Color3.fromRGB(120, 205, 222)
 ESPSection.TextSize = 14
 ESPSection.Font = Enum.Font.GothamBold
 ESPSection.Parent = ContentFrame
@@ -1368,6 +1406,9 @@ CreateToggle("Skeleton", "ShowSkeleton", true)
 CreateToggle("Tracers", "ShowTracer", true)
 CreateToggle("Head Dot", "ShowHeadDot", true)
 CreateToggle("Info Text", "ShowInfo", true)
+CreateToggle("Health Bar", "ShowHealthBar", false)
+CreateToggle("Target Info (HP)", "ShowTargetInfo", false)
+CreateSlider("Chỉ nhắm HP <= %", 1, 100, 100, function(value) Features.TargetHPMax = value end, "TargetHPMax")
 
 CreateSlider("Max Distance", 100, 2000, 1000, function(value)
     Features.MaxDistance = value
@@ -1378,7 +1419,7 @@ local SkinSection = Instance.new("TextLabel")
 SkinSection.Size = UDim2.new(1, 0, 0, 30)
 SkinSection.BackgroundTransparency = 1
 SkinSection.Text = "SKINS"
-SkinSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+SkinSection.TextColor3 = Color3.fromRGB(120, 205, 222)
 SkinSection.TextSize = 14
 SkinSection.Font = Enum.Font.GothamBold
 SkinSection.Parent = ContentFrame
@@ -1400,8 +1441,6 @@ CreateToggle("Unlock All Cosmetics", "UnlockAll", true)
 CreateToggle("Unlock: Skins", "UnlockSkin", true)
 CreateToggle("Unlock: Wraps", "UnlockWrap", true)
 CreateToggle("Unlock: Charms", "UnlockCharm", true)
-CreateToggle("Unlock: Finishers", "UnlockFinisher", true)
-CreateToggle("Unlock: Emotes", "UnlockEmote", true)
 CreateButton("Rarity: All (bấm để đổi)", function(btn)
     Features.UnlockRarity = (Features.UnlockRarity % #Custom.rarityOptions) + 1
     btn.Text = "Rarity: " .. Custom.rarityOptions[Features.UnlockRarity].name
@@ -1412,7 +1451,7 @@ local PlayerSection = Instance.new("TextLabel")
 PlayerSection.Size = UDim2.new(1, 0, 0, 30)
 PlayerSection.BackgroundTransparency = 1
 PlayerSection.Text = "PLAYER"
-PlayerSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+PlayerSection.TextColor3 = Color3.fromRGB(120, 205, 222)
 PlayerSection.TextSize = 14
 PlayerSection.Font = Enum.Font.GothamBold
 PlayerSection.Parent = ContentFrame
@@ -1440,7 +1479,7 @@ local VisualSection = Instance.new("TextLabel")
 VisualSection.Size = UDim2.new(1, 0, 0, 30)
 VisualSection.BackgroundTransparency = 1
 VisualSection.Text = "VISUAL"
-VisualSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+VisualSection.TextColor3 = Color3.fromRGB(120, 205, 222)
 VisualSection.TextSize = 14
 VisualSection.Font = Enum.Font.GothamBold
 VisualSection.Parent = ContentFrame
@@ -1462,7 +1501,7 @@ local function CreateSection(text)
     SectionLabel.Size = UDim2.new(1, 0, 0, 30)
     SectionLabel.BackgroundTransparency = 1
     SectionLabel.Text = text
-    SectionLabel.TextColor3 = Color3.fromRGB(0, 170, 255)
+    SectionLabel.TextColor3 = Color3.fromRGB(120, 205, 222)
     SectionLabel.TextSize = 14
     SectionLabel.Font = Enum.Font.GothamBold
     SectionLabel.Parent = ContentFrame
@@ -1541,7 +1580,7 @@ end)
 local function CreateTextBox(labelText, featureKey, placeholder)
     local Frame = Instance.new("Frame")
     Frame.Size = UDim2.new(1, 0, 0, 45)
-    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    Frame.BackgroundColor3 = Color3.fromRGB(16, 16, 19)
     Frame.BorderSizePixel = 0
 
     local FrameCorner = Instance.new("UICorner")
@@ -1562,7 +1601,7 @@ local function CreateTextBox(labelText, featureKey, placeholder)
     local Box = Instance.new("TextBox")
     Box.Size = UDim2.new(0.6, -20, 0, 28)
     Box.Position = UDim2.new(0.4, 8, 0.5, -14)
-    Box.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    Box.BackgroundColor3 = Color3.fromRGB(38, 38, 44)
     Box.BorderSizePixel = 0
     Box.Text = tostring(Features[featureKey] or "")
     Box.PlaceholderText = placeholder or ""
@@ -1674,6 +1713,10 @@ CreateSlider("Headshot Chance %", 0, 100, 100, function(value)
 end, "SilentHeadChance")
 CreateToggle("Silent Wall Check", "SilentWallCheck", true)
 CreateToggle("Silent AutoFire", "SilentAutoFire", false)
+CreateButton("Silent Hook: " .. Custom.HOOK_MODES[1].name .. " (bấm để đổi)", function(btn)
+    Features.SilentHook = (Features.SilentHook % #Custom.HOOK_MODES) + 1
+    btn.Text = "Silent Hook: " .. Custom.HOOK_MODES[Features.SilentHook].name
+end)
 CreateToggle("Silent Debug Log (F9)", "SilentDebug", false)
 
 CreateSection("AIM LOCK")
@@ -1706,6 +1749,7 @@ CreateToggle("Rage Head Only", "RageHeadOnly", true)
 CreateToggle("Rage Wall Check", "RageWallCheck", true)
 CreateToggle("Rage Snap Camera", "RageSnap", false)
 CreateToggle("Rage Anti Aim", "RageAntiAim", false)
+CreateToggle("Rage: chỉ chạy khi chuột khóa", "RageNeedMouseLock", true)
 
 CreateSection("SHADER / SKY NÂNG CAO")
 CreateSlider("Clouds %", 0, 100, 0, function(value)
@@ -1747,7 +1791,7 @@ local PerfSection = Instance.new("TextLabel")
 PerfSection.Size = UDim2.new(1, 0, 0, 30)
 PerfSection.BackgroundTransparency = 1
 PerfSection.Text = "PERFORMANCE"
-PerfSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+PerfSection.TextColor3 = Color3.fromRGB(120, 205, 222)
 PerfSection.TextSize = 14
 PerfSection.Font = Enum.Font.GothamBold
 PerfSection.Parent = ContentFrame
@@ -1762,7 +1806,7 @@ local TexSection = Instance.new("TextLabel")
 TexSection.Size = UDim2.new(1, 0, 0, 30)
 TexSection.BackgroundTransparency = 1
 TexSection.Text = "TEXTURES (module: n1ghtmare_delta)"
-TexSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+TexSection.TextColor3 = Color3.fromRGB(120, 205, 222)
 TexSection.TextSize = 14
 TexSection.Font = Enum.Font.GothamBold
 TexSection.Parent = ContentFrame
@@ -1777,12 +1821,51 @@ end)
 
 CreateNote("⚠️ Lần đầu bật có thể load chậm, hãy chờ một chút.\n⚠️ Tắt Texture Pack trước khi chạy MC Texture.\n⚠️ Chạy MC Texture xong thì không dùng được texture khác (Map Darkener vẫn dùng được).", 95)
 
+CreateSection("TEXTURE PACK: NHÓM")
+CreateToggle("UI Images", "TexUI", true)
+CreateToggle("Rank Icons", "TexRanks", true)
+CreateToggle("Kill Sounds", "TexKillSounds", true)
+CreateToggle("Match Sounds (win/lose)", "TexMatchSounds", true)
+CreateToggle("Movement Sounds", "TexMoveSounds", true)
+CreateToggle("Menu Sounds", "TexMenuSounds", true)
+CreateToggle("Other Sounds", "TexOtherSounds", true)
+
+CreateSection("MAP TEXTURE")
+CreateToggle("Map Texture", "MapTexture", false)
+CreateTextBox("Image ID / URL", "MapTextureSource", "123456 hoặc https://...")
+CreateButton("Material: " .. Custom.MAP_MATERIALS[1].name .. " (bấm để đổi)", function(btn)
+    Features.MapMaterialIndex = (Features.MapMaterialIndex % #Custom.MAP_MATERIALS) + 1
+    btn.Text = "Material: " .. Custom.MAP_MATERIALS[Features.MapMaterialIndex].name
+end)
+
+CreateSection("DASH SOUND")
+CreateToggle("Dash Sound", "DashSound", false)
+CreateButton("Dash Sound: " .. Custom.SOUND_PRESETS[2].name .. " (bấm để đổi)", function(btn)
+    Features.DashSoundIndex = (Features.DashSoundIndex % #Custom.SOUND_PRESETS) + 1
+    btn.Text = "Dash Sound: " .. Custom.SOUND_PRESETS[Features.DashSoundIndex].name
+end)
+CreateTextBox("Dash Custom ID/URL", "DashSoundCustom", "chọn Sound = Custom")
+CreateSlider("Dash Volume %", 0, 100, 60, function(value) Features.DashVolume = value end, "DashVolume")
+CreateSlider("Dash Sensitivity", 10, 100, 30, function(value) Features.DashSens = value end, "DashSens")
+CreateButton("Test Dash Sound", function() Custom.testDashSound() end)
+
+CreateSection("DOUBLE JUMP SOUND")
+CreateToggle("Double Jump Sound", "DoubleJumpSound", false)
+CreateButton("Jump Sound: " .. Custom.SOUND_PRESETS[4].name .. " (bấm để đổi)", function(btn)
+    Features.DoubleJumpSoundIndex = (Features.DoubleJumpSoundIndex % #Custom.SOUND_PRESETS) + 1
+    btn.Text = "Jump Sound: " .. Custom.SOUND_PRESETS[Features.DoubleJumpSoundIndex].name
+end)
+CreateTextBox("Jump Custom ID/URL", "DoubleJumpSoundCustom", "chọn Sound = Custom")
+CreateSlider("Jump Volume %", 0, 100, 60, function(value) Features.DJVolume = value end, "DJVolume")
+CreateSlider("Jump Sensitivity", 5, 60, 18, function(value) Features.DJSens = value end, "DJSens")
+CreateButton("Test Jump Sound", function() Custom.testJumpSound() end)
+
 -- Sección: MAP DARKENER
 local DarkSection = Instance.new("TextLabel")
 DarkSection.Size = UDim2.new(1, 0, 0, 30)
 DarkSection.BackgroundTransparency = 1
 DarkSection.Text = "MAP DARKENER"
-DarkSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+DarkSection.TextColor3 = Color3.fromRGB(120, 205, 222)
 DarkSection.TextSize = 14
 DarkSection.Font = Enum.Font.GothamBold
 DarkSection.Parent = ContentFrame
@@ -1801,10 +1884,14 @@ local SysSection = Instance.new("TextLabel")
 SysSection.Size = UDim2.new(1, 0, 0, 30)
 SysSection.BackgroundTransparency = 1
 SysSection.Text = "SYSTEM"
-SysSection.TextColor3 = Color3.fromRGB(0, 170, 255)
+SysSection.TextColor3 = Color3.fromRGB(120, 205, 222)
 SysSection.TextSize = 14
 SysSection.Font = Enum.Font.GothamBold
 SysSection.Parent = ContentFrame
+
+CreateSlider("UI Size %", 50, 160, 100, function(value)
+    if Custom.setUIScale then Custom.setUIScale(value) end
+end, "PanelScale")
 
 CreateButton("Switch to Click GUI", function()
     setPanelStyle(1)
@@ -1823,7 +1910,7 @@ FOVCircle.NumSides = 64
 FOVCircle.Radius = Features.FOV
 FOVCircle.Filled = false
 FOVCircle.Visible = false
-FOVCircle.Color = Color3.fromRGB(0, 170, 255)
+FOVCircle.Color = Color3.fromRGB(120, 205, 222)
 FOVCircle.Transparency = 0.6
 
 local function isEnemy(player)
@@ -1973,10 +2060,21 @@ do
         return rayParams
     end
 
+    -- Cache kết quả nhìn xuyên tường 0.12s / người (giảm mạnh số raycast mỗi lần quét)
+    local visCache = setmetatable({}, {__mode = "k"})
     local function isVisible(targetPart, targetChar)
+        local now = os.clock()
+        local c = visCache[targetChar]
+        if c and c.p == targetPart and now - c.t < 0.12 then return c.v end
         local origin = Camera.CFrame.Position
         local result = Workspace:Raycast(origin, targetPart.Position - origin, getRayParams())
-        return result == nil or result.Instance:IsDescendantOf(targetChar)
+        local v = result == nil or result.Instance:IsDescendantOf(targetChar)
+        if c then
+            c.t, c.v, c.p = now, v, targetPart
+        else
+            visCache[targetChar] = {t = now, v = v, p = targetPart}
+        end
+        return v
     end
 
     -- kind: 1 = Head, 2 = Torso, 3 = Root
@@ -2015,6 +2113,7 @@ do
                 local root = c:FindFirstChild("HumanoidRootPart")
                 local part = getAimPart(c, kind)
                 if hum and hum.Health > 0 and root and part
+                    and hum.Health / math.max(hum.MaxHealth, 1) * 100 <= Features.TargetHPMax
                     and (root.Position - myRoot.Position).Magnitude <= range then
                     local pos = part.Position + Vector3.new(0, Features.AimOffset, 0)
                     local sp, onScreen = Camera:WorldToViewportPoint(pos)
@@ -2052,7 +2151,8 @@ do
                 local root = c:FindFirstChild("HumanoidRootPart")
                 local head = c:FindFirstChild("Head")
                 local aim = head or root
-                if hum and hum.Health > 0 and root and aim then
+                if hum and hum.Health > 0 and root and aim
+                    and hum.Health / math.max(hum.MaxHealth, 1) * 100 <= Features.TargetHPMax then
                     local dist = (root.Position - myRoot.Position).Magnitude
                     if dist <= Features.RageRange and (not Features.RageWallCheck or isVisible(aim, c)) then
                         local score
@@ -2241,7 +2341,7 @@ do
 
     -- Hook hàm: bắt cả trường hợp game lưu sẵn `local raycast = workspace.Raycast` rồi gọi trực tiếp
     local function installRaycastFunctionHook()
-        if not hookfunction then return end
+        if not hookfunction then return false end
         local original
         local handler = function(self, origin, direction, ...)
             if original and silentActive() and self == Workspace
@@ -2253,7 +2353,11 @@ do
             return original(self, origin, direction, ...)
         end
         local ok, result = pcall(hookfunction, Workspace.Raycast, newcclosure and newcclosure(handler) or handler)
-        if ok then original = result end
+        if ok and type(result) == "function" then
+            original = result
+            return true
+        end
+        return false
     end
 
     local function installMouseHook()
@@ -2275,23 +2379,38 @@ do
         oldIndex = hookmetamethod(game, "__index", newcclosure and newcclosure(handler) or handler)
     end
 
+    -- Mặc định hook CHỈ hàm Raycast (không đụng tới mọi lệnh gọi trong game như __namecall,
+    -- cách này hay gây đơ / crash). Chỉ dùng namecall khi executor thiếu hookfunction,
+    -- khi chọn Hook = Namecall, hoặc khi Silent Mode = Camera.
     local function ensureSilentHooks()
-        if not hookmetamethod then
-            if not warnedNoHook then
-                warnedNoHook = true
-                showNotification("Silent Aim", "Executor thiếu hookmetamethod, Silent Aim không hoạt động", 6)
-            end
-            return
-        end
         local mode = Features.SilentMode
         if (mode == 1 or mode == 3 or mode == 4) and not raycastHooked then
             raycastHooked = true
-            installRaycastHook()
-            installRaycastFunctionHook()
+            local installed = false
+            if Features.SilentHook == 1 and mode ~= 4 and hookfunction then
+                local ok, result = pcall(installRaycastFunctionHook)
+                installed = ok and result == true
+            end
+            if not installed then
+                if hookmetamethod then
+                    local ok, err = pcall(installRaycastHook)
+                    installed = ok
+                    if not ok then warn("[Khang Hub] Hook namecall lỗi: " .. tostring(err)) end
+                end
+            end
+            if installed then
+                print("[Khang Hub] Silent hook OK (" .. (Features.SilentHook == 1 and mode ~= 4 and hookfunction and "Function" or "Namecall") .. ")")
+            elseif not warnedNoHook then
+                warnedNoHook = true
+                showNotification("Silent Aim", "Executor không hỗ trợ hook cần thiết, Silent Aim không hoạt động", 6)
+            end
         end
         if (mode == 2 or mode == 3) and not mouseHooked then
             mouseHooked = true
-            installMouseHook()
+            if hookmetamethod then
+                local ok, err = pcall(installMouseHook)
+                if not ok then warn("[Khang Hub] Hook mouse lỗi: " .. tostring(err)) end
+            end
         end
     end
 
@@ -2302,6 +2421,14 @@ do
     local rageTimer = 0
     local fovShown, aimCircleShown, debugTimer = false, false, 0
     local scanTimer, aimCache = 0, nil
+    local hooksMode, lastFov, lastAimR, lastCenter = nil, nil, nil, nil
+    local TargetInfo = Drawing.new("Text")
+    TargetInfo.Size = 16
+    TargetInfo.Center = true
+    TargetInfo.Outline = true
+    TargetInfo.Font = 2
+    TargetInfo.Visible = false
+    local hudTimer, hudPlayer, hudShown, hudPos = 0, nil, false, nil
     local lockTarget = nil
 
     local function getTriggerTarget()
@@ -2329,9 +2456,9 @@ do
 
         -- Vòng FOV (chỉ ghi Drawing khi đang hiện hoặc vừa đổi trạng thái)
         if Features.SilentAim then
-            FOVCircle.Position = center
-            FOVCircle.Radius = Features.FOV
-            FOVCircle.Visible = true
+            if lastCenter ~= center then lastCenter = center FOVCircle.Position = center end
+            if lastFov ~= Features.FOV then lastFov = Features.FOV FOVCircle.Radius = lastFov end
+            if not fovShown then FOVCircle.Visible = true end
             fovShown = true
         elseif fovShown then
             FOVCircle.Visible = false
@@ -2339,8 +2466,8 @@ do
         end
         if Features.Aimbot and Features.AimbotShowCircle then
             AimbotCircle.Position = center
-            AimbotCircle.Radius = Features.AimbotFOV
-            AimbotCircle.Visible = true
+            if lastAimR ~= Features.AimbotFOV then lastAimR = Features.AimbotFOV AimbotCircle.Radius = lastAimR end
+            if not aimCircleShown then AimbotCircle.Visible = true end
             aimCircleShown = true
         elseif aimCircleShown then
             AimbotCircle.Visible = false
@@ -2426,11 +2553,15 @@ do
         end
 
         -- Silent Aim
-        if Features.SilentAim or Features.RageBot then ensureSilentHooks() end
+        -- Cài hook ở luồng riêng, chỉ khi bật lần đầu / đổi mode (trước đây chạy ngay trong frame render nên bị đơ)
+        if (Features.SilentAim or Features.RageBot) and hooksMode ~= Features.SilentMode then
+            hooksMode = Features.SilentMode
+            task.spawn(ensureSilentHooks)
+        end
         if Features.RageBot then
-            if scanDue or not silentTarget then silentTarget = findRageTarget() end
+            if scanDue then silentTarget = findRageTarget() end
         else
-            if scanDue or not silentTarget then updateSilentTarget() end
+            if scanDue then updateSilentTarget() end
         end
         if silentTarget then
             if silentTarget.part.Parent then
@@ -2442,7 +2573,8 @@ do
         setAutoFire(Features.SilentAim and not Features.RageBot and Features.SilentAutoFire and silentTarget ~= nil)
 
         -- Rage Bot: tự bắn + (tuỳ chọn) kéo camera thẳng vào mục tiêu
-        if Features.RageBot and silentTarget then
+        local rageLocked = not Features.RageNeedMouseLock or UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter
+        if Features.RageBot and silentTarget and rageLocked then
             if Features.RageSnap then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, silentTarget.position)
             end
@@ -2468,6 +2600,27 @@ do
             TargetMarker.Visible = onScreen
         else
             TargetMarker.Visible = false
+        end
+
+        -- HUD máu mục tiêu
+        if Features.ShowTargetInfo and shown and shown.character then
+            hudTimer += dt
+            if hudTimer >= 0.1 or hudPlayer ~= shown.player then
+                hudTimer = 0
+                hudPlayer = shown.player
+                local hum = shown.character:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    local pct = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+                    TargetInfo.Text = string.format("%s   %d/%d HP", shown.player.Name, math.floor(hum.Health), math.floor(hum.MaxHealth))
+                    TargetInfo.Color = Color3.fromHSV(pct * 0.33, 1, 1)
+                end
+            end
+            local pos = Vector2.new(center.X, center.Y + (Features.SilentAim and Features.FOV or 100) + 14)
+            if hudPos ~= pos then hudPos = pos TargetInfo.Position = pos end
+            if not hudShown then TargetInfo.Visible = true hudShown = true end
+        elseif hudShown then
+            TargetInfo.Visible = false
+            hudShown = false
         end
 
         -- Trigger Bot
@@ -2509,9 +2662,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if input.KeyCode ~= Enum.KeyCode.Unknown then
             Keybinds[listeningForKey] = input.KeyCode
             for _, child in pairs(ContentFrame:GetDescendants()) do
-                if child:IsA("TextButton") and child.Text:match("%[%.%.%.%]") and child.BackgroundColor3 == Color3.fromRGB(0, 170, 255) then
+                if child:IsA("TextButton") and child.Text:match("%[%.%.%.%]") and child.BackgroundColor3 == Color3.fromRGB(120, 205, 222) then
                     child.Text = "[" .. input.KeyCode.Name .. "]"
-                    child.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+                    child.BackgroundColor3 = Color3.fromRGB(70, 150, 165)
                     break
                 end
             end
@@ -2529,7 +2682,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 for _, child in pairs(ContentFrame:GetDescendants()) do
                     if child:IsA("TextButton") and child.Parent:FindFirstChild("TextLabel") and child.Parent.TextLabel.Text == "Silent Aim" then
                         child.Text = Features.SilentAim and "ON" or "OFF"
-                        child.BackgroundColor3 = Features.SilentAim and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+                        child.BackgroundColor3 = Features.SilentAim and Color3.fromRGB(120, 205, 222) or Color3.fromRGB(50, 50, 56)
                     end
                 end
             elseif feature == "ESP" then
@@ -2544,7 +2697,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 for _, child in pairs(ContentFrame:GetDescendants()) do
                     if child:IsA("TextButton") and child.Parent:FindFirstChild("TextLabel") and child.Parent.TextLabel.Text == "Enable ESP" then
                         child.Text = Features.ESP and "ON" or "OFF"
-                        child.BackgroundColor3 = Features.ESP and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+                        child.BackgroundColor3 = Features.ESP and Color3.fromRGB(120, 205, 222) or Color3.fromRGB(50, 50, 56)
                     end
                 end
             elseif feature == "TeamCheck" then
@@ -2552,7 +2705,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 for _, child in pairs(ContentFrame:GetDescendants()) do
                     if child:IsA("TextButton") and child.Parent:FindFirstChild("TextLabel") and child.Parent.TextLabel.Text == "Team Check" then
                         child.Text = Features.TeamCheck and "ON" or "OFF"
-                        child.BackgroundColor3 = Features.TeamCheck and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+                        child.BackgroundColor3 = Features.TeamCheck and Color3.fromRGB(120, 205, 222) or Color3.fromRGB(50, 50, 56)
                     end
                 end
             end
@@ -2603,6 +2756,19 @@ local function createESP(player)
     infoText.Visible = false
     table.insert(objects, infoText)
     
+    -- Thanh máu (nền + phần máu)
+    local barBg = Drawing.new("Line")
+    barBg.Thickness = 4
+    barBg.Color = Color3.fromRGB(15, 15, 15)
+    barBg.Transparency = 0.7
+    barBg.Visible = false
+    table.insert(objects, barBg)
+
+    local barFill = Drawing.new("Line")
+    barFill.Thickness = 2
+    barFill.Visible = false
+    table.insert(objects, barFill)
+
     espObjects[player] = {objects = objects}
 end
 
@@ -2788,7 +2954,7 @@ RunService.RenderStepped:Connect(function(dt)
                     local ip, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.2, 0))
                     if onScreen then
                         infoText.Position = Vector2.new(ip.X, ip.Y)
-                        local text = string.format("%s [%d%%] (%dm)", player.Name, math.floor(humanoid.Health), math.floor(distance))
+                        local text = string.format("%s [%d/%d HP] (%dm)", player.Name, math.floor(humanoid.Health), math.floor(humanoid.MaxHealth), math.floor(distance))
                         if data.infoText ~= text then
                             data.infoText = text
                             infoText.Text = text
@@ -2800,6 +2966,32 @@ RunService.RenderStepped:Connect(function(dt)
                     end
                 else
                     espVis(data, infoText, false)
+                end
+
+                -- Thanh máu
+                local barBg, barFill = objects[18], objects[19]
+                if Features.ShowHealthBar and head and barBg and barFill then
+                    local hv, hon = proj(head)
+                    local rv, ron = Camera:WorldToViewportPoint(hrp.Position)
+                    if hon and ron then
+                        local height = math.max((rv.Y - hv.Y) * 2.4, 12)
+                        local top = hv.Y - height * 0.12
+                        local x = hv.X - height * 0.28 - 6
+                        local ratio = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
+                        barBg.From = Vector2.new(x, top)
+                        barBg.To = Vector2.new(x, top + height)
+                        barFill.From = Vector2.new(x, top + height)
+                        barFill.To = Vector2.new(x, top + height - height * ratio)
+                        espColor(data, barFill, Color3.fromHSV(ratio * 0.33, 1, 1))
+                        espVis(data, barBg, true)
+                        espVis(data, barFill, true)
+                    else
+                        espVis(data, barBg, false)
+                        espVis(data, barFill, false)
+                    end
+                elseif barBg and barFill then
+                    espVis(data, barBg, false)
+                    espVis(data, barFill, false)
                 end
             end
         end
@@ -3379,10 +3571,18 @@ do
     local IdMap, idMapBuilt = {}, false
     local packEnabled, textureConn = false, nil
 
+    local function hashUrl(url)
+        local h = 5381
+        for i = 1, #url do h = (h * 33 + string.byte(url, i)) % 4294967296 end
+        return string.format("%08x", h)
+    end
+
     local function getAsset(url)
         local success, result = pcall(function()
             if writefile and isfile and getcustomasset then
-                local fileName = "tex_" .. tostring(string.len(url) % 99999) .. "_" .. tostring(string.byte(url, 10) or 1) .. ".asset"
+                local ext = url:match("%.(%w+)$") or "asset"
+                if #ext > 5 then ext = "asset" end
+                local fileName = "tex_" .. hashUrl(url) .. "." .. ext
                 if not isfile(fileName) then
                     local data = game:HttpGet(url)
                     if data and #data > 80 then writefile(fileName, data) end
@@ -3451,16 +3651,48 @@ do
         {ids = {17016581922}, url = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/elimin.mp3"},
     }
 
-    -- Tải tài nguyên khi bật lần đầu (không chặn lúc load script)
-    local function buildIdMap()
-        if idMapBuilt then return end
+    -- Chia nhóm cho từng rule (bật / tắt riêng từng nhóm trong menu)
+    local RANK_FILES = {["top200xrank.png"] = true, ["nemx.png"] = true}
+    for _, f in ipairs({"f", "d-", "d", "d+", "c-", "c", "c+", "b-", "b", "b+", "a-", "a", "a+", "s", "ss", "u"}) do
+        RANK_FILES[f .. ".png"] = true
+    end
+    local KILL_FILES = {["kill1.ogg"] = true, ["kill2.ogg"] = true, ["kill3.ogg"] = true, ["elimin.mp3"] = true}
+    local MATCH_FILES = {
+        ["allclear.base.ogg"] = true, ["winnerwinner.ogg"] = true, ["showscore.base.ogg"] = true,
+        ["studio-audience-awwww-sound-fx.mp3"] = true, ["final-fantasy-vii-victory-fanfare-1.mp3"] = true,
+    }
+    local MOVE_FILES = {["Sliding.mp3"] = true}
+    local MENU_FILES = {["menuclick.base.ogg"] = true, ["achievement_3.base.ogg"] = true, ["target.base.ogg"] = true}
+    local UI_ASSETS = {["rbxassetid://72106446453934"] = true}
+
+    local function categoryOf(rule)
+        local url = rule.url
+        local file = url:match("([^/]+)$") or url
+        if RANK_FILES[file] then return "TexRanks" end
+        if KILL_FILES[file] then return "TexKillSounds" end
+        if MATCH_FILES[file] then return "TexMatchSounds" end
+        if MOVE_FILES[file] then return "TexMoveSounds" end
+        if MENU_FILES[file] then return "TexMenuSounds" end
+        if file:match("%.png$") or file:match("%.webp$") or UI_ASSETS[url] then return "TexUI" end
+        return "TexOtherSounds"
+    end
+
+    for _, rule in ipairs(Rules) do
+        rule.cat = categoryOf(rule)
+        for _, id in ipairs(rule.ids) do IdMap[tostring(id)] = rule end
+    end
+
+    -- Chỉ tải các nhóm đang bật (không chặn lúc load script)
+    local function ensureAssets()
         for _, rule in ipairs(Rules) do
             if khangUnloaded then return end
-            local asset = getAsset(rule.url)
-            for _, id in ipairs(rule.ids) do IdMap[tostring(id)] = asset end
+            if rule.asset == nil and Features[rule.cat] ~= false then
+                rule.asset = getAsset(rule.url)
+            end
         end
-        idMapBuilt = true
     end
+
+    Custom.resolveAsset = getAsset
 
     local function restoreAllOriginalAssets()
         for obj, props in pairs(OriginalAssets) do
@@ -3481,10 +3713,11 @@ do
             if not success or type(value) ~= "string" then return end
 
             local id = string.match(value, "%d+")
-            if id and IdMap[id] then
+            local rule = id and IdMap[id]
+            if rule and rule.asset and Features[rule.cat] ~= false then
                 if not OriginalAssets[obj] then OriginalAssets[obj] = {} end
                 if not OriginalAssets[obj][property] then OriginalAssets[obj][property] = value end
-                pcall(function() obj[property] = IdMap[id] end)
+                pcall(function() obj[property] = rule.asset end)
             end
         end
 
@@ -3498,7 +3731,7 @@ do
         if packEnabled then return end
         packEnabled = true
         task.spawn(function()
-            buildIdMap()
+            ensureAssets()
             if not packEnabled or khangUnloaded then return end
             batchProcess(game:GetDescendants(), applyTextureSwap, 150)
             textureConn = game.DescendantAdded:Connect(function(obj)
@@ -3520,6 +3753,18 @@ do
 
     function Custom.isTextureActive()
         return packEnabled
+    end
+
+    -- Áp dụng lại khi bật / tắt một nhóm
+    function Custom.refreshTexturePack()
+        if not packEnabled then return end
+        restoreAllOriginalAssets()
+        task.spawn(function()
+            ensureAssets()
+            if packEnabled and not khangUnloaded then
+                batchProcess(game:GetDescendants(), applyTextureSwap, 150)
+            end
+        end)
     end
 end
 
@@ -3631,6 +3876,191 @@ do
     end
 end
 
+-- ---------- Map texture (đổi ảnh / chất liệu của map) ----------
+do
+    local active, conn = false, nil
+    local original = setmetatable({}, {__mode = "k"})
+    local currentAsset, currentMaterial = nil, nil
+
+    local function resolveSource()
+        local src = tostring(Features.MapTextureSource or ""):match("^%s*(.-)%s*$")
+        if src == "" then return nil end
+        if src:match("^%d+$") then return "rbxassetid://" .. src end
+        if src:match("^https?://") and Custom.resolveAsset then return Custom.resolveAsset(src) end
+        return src
+    end
+
+    local function resolveMaterial()
+        local option = Custom.MAP_MATERIALS[Features.MapMaterialIndex]
+        if option and option.mat then return Enum.Material[option.mat] end
+        return nil
+    end
+
+    local function isMapObject(obj)
+        if obj:IsDescendantOf(Camera) then return false end -- viewmodel
+        local model = obj:FindFirstAncestorOfClass("Model")
+        if model and Players:GetPlayerFromCharacter(model) then return false end
+        return true
+    end
+
+    local function remember(obj, prop, value)
+        local entry = original[obj]
+        if not entry then entry = {} original[obj] = entry end
+        if entry[prop] == nil then entry[prop] = value end
+    end
+
+    local function applyTo(obj)
+        if khangUnloaded or not active or not obj or not obj:IsDescendantOf(Workspace) then return end
+        if obj:IsA("Decal") or obj:IsA("Texture") then
+            if currentAsset and isMapObject(obj) then
+                remember(obj, "Texture", obj.Texture)
+                obj.Texture = currentAsset
+            end
+        elseif obj:IsA("BasePart") and not obj:IsA("Terrain") then
+            if currentMaterial and isMapObject(obj) then
+                remember(obj, "Material", obj.Material)
+                obj.Material = currentMaterial
+            end
+        end
+    end
+
+    local function restoreAll()
+        local items = {}
+        for obj, props in pairs(original) do items[#items + 1] = {obj, props} end
+        original = setmetatable({}, {__mode = "k"})
+        task.spawn(function()
+            for i, item in ipairs(items) do
+                local obj, props = item[1], item[2]
+                if obj and obj.Parent then
+                    for prop, value in pairs(props) do pcall(function() obj[prop] = value end) end
+                end
+                if i % 400 == 0 then task.wait() end
+            end
+        end)
+    end
+
+    local function applyAll()
+        task.spawn(function()
+            currentAsset = resolveSource()
+            currentMaterial = resolveMaterial()
+            if not active or khangUnloaded then return end
+            batchProcess(Workspace:GetDescendants(), applyTo, 200)
+        end)
+    end
+
+    function Custom.mapTexEnable()
+        if active then return end
+        active = true
+        applyAll()
+        conn = Workspace.DescendantAdded:Connect(function(obj)
+            if active and not khangUnloaded then task.defer(applyTo, obj) end
+        end)
+    end
+
+    function Custom.mapTexDisable()
+        active = false
+        if conn then conn:Disconnect() conn = nil end
+        restoreAll()
+    end
+
+    function Custom.mapTexRefresh()
+        if not active then return end
+        restoreAll()
+        applyAll()
+    end
+
+    function Custom.isMapTexActive()
+        return active
+    end
+end
+
+-- ---------- Âm thanh Dash / Double Jump ----------
+-- Game không báo sự kiện dash / double jump ra ngoài, nên script nhận diện qua chuyển động:
+--   Dash       = tốc độ ngang tăng vọt trong 1 frame
+--   Double jump = đang ở trên không rồi vận tốc đi lên tăng vọt
+do
+    local SoundService = game:GetService("SoundService")
+    local Debris = game:GetService("Debris")
+    local cache = {}
+
+    local function resolveSound(index, custom)
+        local option = Custom.SOUND_PRESETS[index]
+        if not option or option.name == "Off" then return nil end
+        local src
+        if option.name == "Custom" then
+            local text = tostring(custom or ""):match("^%s*(.-)%s*$")
+            if text == "" then return nil end
+            src = text:match("^%d+$") and ("rbxassetid://" .. text) or text
+        else
+            src = option.url
+        end
+        if not src then return nil end
+        if cache[src] then return cache[src] end
+        local asset = src
+        if src:match("^https?://") and Custom.resolveAsset then asset = Custom.resolveAsset(src) end
+        cache[src] = asset
+        return asset
+    end
+
+    local function playSound(index, custom, volume)
+        task.spawn(function()
+            local ok, asset = pcall(resolveSound, index, custom)
+            if not ok or not asset then return end
+            local snd = Instance.new("Sound")
+            snd.SoundId = asset
+            snd.Volume = math.clamp(volume / 100, 0, 1) * 2
+            snd.Parent = SoundService
+            snd:Play()
+            Debris:AddItem(snd, 6)
+        end)
+    end
+
+    function Custom.testDashSound()
+        playSound(Features.DashSoundIndex, Features.DashSoundCustom, Features.DashVolume)
+    end
+    function Custom.testJumpSound()
+        playSound(Features.DoubleJumpSoundIndex, Features.DoubleJumpSoundCustom, Features.DJVolume)
+    end
+
+    local lastSpeed, lastVy, airTime = 0, 0, 0
+    local lastDash, lastJump = 0, 0
+    local warm = 0
+
+    RunService.Heartbeat:Connect(function(dt)
+        if khangUnloaded then return end
+
+        -- Tải sẵn âm thanh đã chọn để lần phát đầu không bị trễ
+        warm += dt
+        if warm >= 2 then
+            warm = 0
+            if Features.DashSound then task.spawn(pcall, resolveSound, Features.DashSoundIndex, Features.DashSoundCustom) end
+            if Features.DoubleJumpSound then task.spawn(pcall, resolveSound, Features.DoubleJumpSoundIndex, Features.DoubleJumpSoundCustom) end
+        end
+
+        if not (Features.DashSound or Features.DoubleJumpSound) then return end
+        local hum, root = getHumanoid(), getRoot()
+        if not hum or not root or hum.Health <= 0 then return end
+
+        local v = root.AssemblyLinearVelocity
+        local horizontal = Vector3.new(v.X, 0, v.Z).Magnitude
+        local now = os.clock()
+
+        if hum.FloorMaterial == Enum.Material.Air then airTime += dt else airTime = 0 end
+
+        if not Features.Fly and not Features.TargetStrafe then
+            if Features.DashSound and horizontal - lastSpeed > Features.DashSens and now - lastDash > 0.5 then
+                lastDash = now
+                playSound(Features.DashSoundIndex, Features.DashSoundCustom, Features.DashVolume)
+            end
+            if Features.DoubleJumpSound and airTime > 0.12 and v.Y - lastVy > Features.DJSens and now - lastJump > 0.4 then
+                lastJump = now
+                playSound(Features.DoubleJumpSoundIndex, Features.DoubleJumpSoundCustom, Features.DJVolume)
+            end
+        end
+        lastSpeed, lastVy = horizontal, v.Y
+    end)
+end
+
 -- ---------- MC texture (script ngoài) ----------
 function runMcTexture(btn)
     btn.Text = "Loading... (Please wait)"
@@ -3664,6 +4094,7 @@ function unloadHub()
 
     pcall(disableTexturePack)
     pcall(disableDarkener)
+    pcall(function() if Custom.mapTexDisable then Custom.mapTexDisable() end end)
     pcall(disableBoost)
     pcall(disableSky)
     pcall(function() Custom.stopEmote() end)
@@ -4638,8 +5069,977 @@ do
     end)
 end
 
+-- ===== KhangUI (thư viện giao diện, nhúng sẵn) =====
+local KhangUILib = (function()
+--[[
+    KhangUI - UI library gọn nhẹ cho Roblox (Luau)
+
+    local KhangUI = loadstring(readfile("KhangUI.lua"))()
+    local Win = KhangUI.new({Title = "Khang Hub", ToggleKey = Enum.KeyCode.RightShift, Style = 1})
+    -- Style: 1 = Sidebar, 2 = Top Tabs, 3 = Click GUI (panel nổi nhiều cột)
+    -- Win:SetStyle(2) hoặc Win:SetStyle("Click GUI"); nút "UI: ... ⇄" trên cùng màn hình để đổi nhanh
+    local Tab = Win:AddTab("Main")
+    Tab:AddSection("Combat")
+    Tab:AddToggle({Name = "Enable", Flag = "Enable", Default = false, Callback = function(v) end})
+    Tab:AddSlider({Name = "Speed", Flag = "Speed", Min = 16, Max = 200, Default = 50, Callback = function(v) end})
+    Tab:AddDropdown({Name = "Mode", Flag = "Mode", Options = {"A","B","C"}, Default = "A", Callback = function(v) end})
+    Tab:AddKeybind({Name = "Bind", Flag = "Bind", Default = Enum.KeyCode.F, Callback = function() end})
+    Tab:AddTextBox({Name = "ID", Flag = "ID", Placeholder = "...", Callback = function(text) end})
+    Tab:AddButton({Name = "Click", Callback = function() end})
+    Tab:AddLabel("Ghi chú")
+    Win:Notify("Title", "Nội dung", 4)
+    Win:SaveConfig("default") / Win:LoadConfig("default")
+    Win:Destroy()
+
+    Giá trị hiện tại của mọi element: Win.Flags.TênFlag
+    Mọi element đều có :Set(value) và :Get()
+]]
+
+local UIS = game:GetService("UserInputService")
+local TS = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+
+local Lib = {}
+Lib.__index = Lib
+
+Lib.Themes = {
+    Blue   = {Accent = Color3.fromRGB(84, 112, 255)},
+    Purple = {Accent = Color3.fromRGB(150, 90, 255)},
+    Red    = {Accent = Color3.fromRGB(235, 70, 80)},
+    Green  = {Accent = Color3.fromRGB(60, 200, 120)},
+    Orange = {Accent = Color3.fromRGB(255, 150, 50)},
+    Pink   = {Accent = Color3.fromRGB(255, 100, 180)},
+    Cyan   = {Accent = Color3.fromRGB(0, 190, 230)},
+}
+
+local BASE = {
+    Background = Color3.fromRGB(22, 22, 27),
+    Sidebar    = Color3.fromRGB(28, 28, 34),
+    Element    = Color3.fromRGB(36, 36, 43),
+    Off        = Color3.fromRGB(62, 62, 72),
+    Text       = Color3.fromRGB(235, 235, 240),
+    SubText    = Color3.fromRGB(165, 165, 175),
+}
+
+local function create(class, props, parent)
+    local obj = Instance.new(class)
+    for k, v in pairs(props or {}) do obj[k] = v end
+    obj.Parent = parent
+    return obj
+end
+
+local function corner(obj, radius)
+    return create("UICorner", {CornerRadius = UDim.new(0, radius or 6)}, obj)
+end
+
+local function getGuiParent()
+    local ok, ui = pcall(function() return gethui and gethui() end)
+    if ok and ui then return ui end
+    local ok2 = pcall(function() return CoreGui.Name end)
+    if ok2 then return CoreGui end
+    return Players.LocalPlayer:WaitForChild("PlayerGui")
+end
+
+function Lib.new(opts)
+    opts = opts or {}
+    local self = setmetatable({}, Lib)
+    self.Flags = {}
+    self.Setters = {}
+    self.Tabs = {}
+    self.Connections = {}
+    self.Themed = {}
+    self.Colors = {}
+    for k, v in pairs(BASE) do self.Colors[k] = v end
+    for k, v in pairs(opts.Colors or {}) do self.Colors[k] = v end
+    self.Colors.Accent = opts.Accent or self.Colors.Accent or Lib.Themes.Blue.Accent
+    self.ScaleValue = 1
+    if opts.ToggleKey == nil then
+        self.ToggleKey = Enum.KeyCode.RightShift
+    else
+        self.ToggleKey = opts.ToggleKey -- false = không tự ẩn/hiện bằng phím
+    end
+    self.ConfigFolder = opts.ConfigFolder or "KhangUI"
+    self.Destroyed = false
+    self.ActiveDrag = nil
+    self.Listening = nil -- keybind đang chờ phím
+
+    local size = opts.Size or Vector2.new(540, 380)
+
+    self.Gui = create("ScreenGui", {
+        Name = opts.Name or "KhangUI",
+        ResetOnSpawn = false,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+        DisplayOrder = 999,
+        IgnoreGuiInset = true,
+    })
+    self.Gui.Parent = getGuiParent()
+
+    self.Main = create("Frame", {
+        Name = "Main",
+        Size = UDim2.fromOffset(size.X, size.Y),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        BackgroundColor3 = self.Colors.Background,
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
+    }, self.Gui)
+    corner(self.Main, 10)
+    self:_track(self.Main, "BackgroundColor3", "Background")
+    self.MainScale = create("UIScale", {}, self.Main)
+
+    -- Title bar
+    local titleBar = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 38),
+        BackgroundColor3 = self.Colors.Sidebar,
+        BorderSizePixel = 0,
+    }, self.Main)
+    self:_track(titleBar, "BackgroundColor3", "Sidebar")
+
+    local titleLabel = create("TextLabel", {
+        Size = UDim2.new(1, -60, 1, 0),
+        Position = UDim2.new(0, 14, 0, 0),
+        BackgroundTransparency = 1,
+        Text = opts.Title or "KhangUI",
+        TextColor3 = self.Colors.Accent,
+        TextSize = 16,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, titleBar)
+    self:_track(titleLabel, "TextColor3", "Accent")
+
+    local closeBtn = create("TextButton", {
+        Size = UDim2.fromOffset(26, 26),
+        Position = UDim2.new(1, -32, 0, 6),
+        BackgroundColor3 = Color3.fromRGB(220, 70, 70),
+        Text = "X",
+        TextColor3 = Color3.new(1, 1, 1),
+        TextSize = 12,
+        Font = Enum.Font.GothamBold,
+        AutoButtonColor = true,
+    }, titleBar)
+    corner(closeBtn, 6)
+    closeBtn.MouseButton1Click:Connect(function() self:SetVisible(false) end)
+
+    -- Kéo cửa sổ
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local startMouse, startPos = input.Position, self.Main.Position
+            self.ActiveDrag = function(move)
+                local d = move.Position - startMouse
+                local k = 1 / (self.ScaleValue or 1)
+                self.Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X * k, startPos.Y.Scale, startPos.Y.Offset + d.Y * k)
+            end
+        end
+    end)
+
+    -- Sidebar + vùng nội dung
+    self.Sidebar = create("ScrollingFrame", {
+        Position = UDim2.new(0, 0, 0, 38),
+        Size = UDim2.new(0, 130, 1, -38),
+        BackgroundColor3 = self.Colors.Sidebar,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 0,
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        CanvasSize = UDim2.new(),
+    }, self.Main)
+    self:_track(self.Sidebar, "BackgroundColor3", "Sidebar")
+    self.SideLayout = create("UIListLayout", {Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}, self.Sidebar)
+    create("UIPadding", {PaddingTop = UDim.new(0, 8), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8)}, self.Sidebar)
+
+    self.Pages = create("Frame", {
+        Position = UDim2.new(0, 130, 0, 38),
+        Size = UDim2.new(1, -130, 1, -38),
+        BackgroundTransparency = 1,
+    }, self.Main)
+
+    -- Style 3 (Click GUI): mỗi tab là một panel nổi
+    self.Panels = create("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1}, self.Gui)
+    self.PanelsScale = create("UIScale", {}, self.Panels)
+
+    -- Nút đổi nhanh giữa 3 kiểu giao diện
+    self.StyleBtn = create("TextButton", {
+        AnchorPoint = Vector2.new(0.5, 0),
+        Position = UDim2.new(0.5, 0, 0, 6),
+        Size = UDim2.fromOffset(190, 26),
+        BackgroundColor3 = self.Colors.Sidebar,
+        BorderSizePixel = 0,
+        TextColor3 = self.Colors.Text,
+        TextSize = 12,
+        Font = Enum.Font.GothamMedium,
+        ZIndex = 50,
+    }, self.Gui)
+    corner(self.StyleBtn, 8)
+    self:_track(self.StyleBtn, "BackgroundColor3", "Sidebar")
+    self.StyleBtn.MouseButton1Click:Connect(function()
+        self:SetStyle((self.Style % 3) + 1)
+    end)
+    self.HideStyleBtn = opts.HideStyleButton and true or false
+    self.Shown = true
+
+    -- Input toàn cục
+    self:_connect(UIS.InputChanged, function(input)
+        if self.ActiveDrag and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            self.ActiveDrag(input)
+        end
+    end)
+    self:_connect(UIS.InputEnded, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            self.ActiveDrag = nil
+        end
+    end)
+    self:_connect(UIS.InputBegan, function(input, processed)
+        if self.Destroyed then return end
+        if self.Listening then
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                local cb = self.Listening
+                self.Listening = nil
+                cb(input.KeyCode)
+            end
+            return
+        end
+        if processed then return end
+        if self.ToggleKey and input.KeyCode == self.ToggleKey then
+            self:SetVisible(not self.Shown)
+            return
+        end
+        for _, bind in ipairs(self.Binds or {}) do
+            if bind.key and input.KeyCode == bind.key then
+                task.spawn(bind.fire)
+            end
+        end
+    end)
+    self.Binds = {}
+
+    -- Container thông báo
+    self.NotifyHolder = create("Frame", {
+        Size = UDim2.new(0, 260, 1, -20),
+        Position = UDim2.new(1, -270, 0, 10),
+        BackgroundTransparency = 1,
+    }, self.Gui)
+    create("UIListLayout", {
+        VerticalAlignment = Enum.VerticalAlignment.Bottom,
+        Padding = UDim.new(0, 6),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+    }, self.NotifyHolder)
+
+    self.Style = 1
+    self:SetStyle(opts.Style or 1)
+
+    return self
+end
+
+-- ---------- Nội bộ ----------
+function Lib:_connect(signal, fn)
+    local c = signal:Connect(fn)
+    table.insert(self.Connections, c)
+    return c
+end
+
+function Lib:_track(obj, prop, colorKey)
+    table.insert(self.Themed, {obj = obj, prop = prop, key = colorKey})
+    return obj
+end
+
+function Lib:_register(flag, default, setter)
+    if not flag then return end
+    self.Flags[flag] = default
+    self.Setters[flag] = setter
+end
+
+-- ---------- API cửa sổ ----------
+function Lib:_updateVisible()
+    local shown = self.Shown
+    self.Main.Visible = shown and self.Style ~= 3
+    self.Panels.Visible = shown and self.Style == 3
+    self.StyleBtn.Visible = shown and not self.HideStyleBtn
+end
+
+function Lib:SetVisible(state)
+    self.Shown = state and true or false
+    self:_updateVisible()
+end
+
+function Lib:SetAccent(color)
+    if type(color) == "string" then
+        local t = Lib.Themes[color]
+        if not t then return end
+        color = t.Accent
+    end
+    self.Colors.Accent = color
+    for _, item in ipairs(self.Themed) do
+        pcall(function() item.obj[item.prop] = self.Colors[item.key] end)
+    end
+    for _, fn in ipairs(self.Refreshers or {}) do pcall(fn) end
+end
+
+function Lib:SetScale(scale)
+    scale = math.clamp(scale, 0.4, 2.5)
+    self.ScaleValue = scale
+    self.MainScale.Scale = scale
+    self.PanelsScale.Scale = scale
+    for _, t in ipairs(self.Tabs) do
+        if t.Resize then t.Resize() end
+    end
+end
+
+function Lib:SetColors(tbl)
+    for k, v in pairs(tbl) do self.Colors[k] = v end
+    for _, item in ipairs(self.Themed) do
+        pcall(function() item.obj[item.prop] = self.Colors[item.key] end)
+    end
+    for _, fn in ipairs(self.Refreshers or {}) do pcall(fn) end
+end
+
+function Lib:Notify(title, body, duration)
+    if self.Destroyed then return end
+    duration = duration or 4
+    local f = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 54),
+        BackgroundColor3 = self.Colors.Sidebar,
+        BorderSizePixel = 0,
+        BackgroundTransparency = 1,
+    }, self.NotifyHolder)
+    corner(f, 8)
+    local bar = create("Frame", {Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = self.Colors.Accent, BorderSizePixel = 0}, f)
+    corner(bar, 2)
+    local t = create("TextLabel", {
+        Size = UDim2.new(1, -16, 0, 20), Position = UDim2.new(0, 12, 0, 6), BackgroundTransparency = 1,
+        Text = tostring(title), TextColor3 = self.Colors.Accent, TextSize = 13, Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1,
+    }, f)
+    local b = create("TextLabel", {
+        Size = UDim2.new(1, -16, 0, 20), Position = UDim2.new(0, 12, 0, 27), BackgroundTransparency = 1,
+        Text = tostring(body or ""), TextColor3 = self.Colors.Text, TextSize = 12, Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, TextTransparency = 1,
+    }, f)
+    local info = TweenInfo.new(0.25)
+    TS:Create(f, info, {BackgroundTransparency = 0}):Play()
+    TS:Create(t, info, {TextTransparency = 0}):Play()
+    TS:Create(b, info, {TextTransparency = 0}):Play()
+    task.delay(duration, function()
+        if self.Destroyed or not f.Parent then return end
+        TS:Create(f, info, {BackgroundTransparency = 1}):Play()
+        TS:Create(t, info, {TextTransparency = 1}):Play()
+        TS:Create(b, info, {TextTransparency = 1}):Play()
+        task.wait(0.3)
+        if f.Parent then f:Destroy() end
+    end)
+end
+
+-- ---------- Config ----------
+function Lib:_configPath(name)
+    return self.ConfigFolder .. "/" .. (name or "default") .. ".json"
+end
+
+function Lib:SaveConfig(name)
+    if not writefile then return false end
+    local data = {}
+    for flag, value in pairs(self.Flags) do
+        local t = typeof(value)
+        if t == "boolean" or t == "number" or t == "string" then
+            data[flag] = value
+        elseif t == "EnumItem" then
+            data[flag] = {__key = value.Name}
+        end
+    end
+    local ok = pcall(function()
+        if makefolder and isfolder and not isfolder(self.ConfigFolder) then makefolder(self.ConfigFolder) end
+        writefile(self:_configPath(name), HttpService:JSONEncode(data))
+    end)
+    return ok
+end
+
+function Lib:LoadConfig(name)
+    if not (readfile and isfile) then return false end
+    local path = self:_configPath(name)
+    if not isfile(path) then return false end
+    local ok, data = pcall(function() return HttpService:JSONDecode(readfile(path)) end)
+    if not ok or type(data) ~= "table" then return false end
+    for flag, value in pairs(data) do
+        local setter = self.Setters[flag]
+        if setter then
+            if type(value) == "table" and value.__key then
+                value = Enum.KeyCode[value.__key]
+            end
+            if value ~= nil then pcall(setter, value) end
+        end
+    end
+    return true
+end
+
+function Lib:Destroy()
+    if self.Destroyed then return end
+    self.Destroyed = true
+    for _, c in ipairs(self.Connections) do pcall(function() c:Disconnect() end) end
+    self.Connections = {}
+    if self.Gui then self.Gui:Destroy() end
+end
+
+-- ---------- Tab ----------
+local Tab = {}
+Tab.__index = Tab
+
+function Lib:AddTab(name)
+    local win = self
+    local tab = setmetatable({Window = win, Name = name}, Tab)
+
+    local btn = create("TextButton", {
+        Size = UDim2.new(1, 0, 0, 30),
+        BackgroundColor3 = win.Colors.Accent,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Text = name,
+        TextColor3 = win.Colors.SubText,
+        TextSize = 13,
+        Font = Enum.Font.GothamMedium,
+        AutoButtonColor = false,
+        LayoutOrder = #win.Tabs + 1,
+    }, win.Sidebar)
+    corner(btn, 6)
+
+    local page = create("ScrollingFrame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 3,
+        ScrollBarImageColor3 = win.Colors.SubText,
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        CanvasSize = UDim2.new(),
+        Visible = false,
+    }, win.Pages)
+    local layout = create("UIListLayout", {Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder}, page)
+    create("UIPadding", {PaddingTop = UDim.new(0, 8), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 12), PaddingBottom = UDim.new(0, 8)}, page)
+
+    tab.Button, tab.Page, tab.Order = btn, page, 0
+    table.insert(win.Tabs, tab)
+
+    -- Panel cho style 3
+    local panel = create("Frame", {
+        Size = UDim2.fromOffset(190, 120),
+        BackgroundColor3 = win.Colors.Background,
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
+        Visible = false,
+    }, win.Panels)
+    corner(panel, 10)
+    win:_track(panel, "BackgroundColor3", "Background")
+    local header = create("TextButton", {
+        Size = UDim2.new(1, 0, 0, 34),
+        BackgroundTransparency = 1,
+        Text = name,
+        TextColor3 = win.Colors.Accent,
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        AutoButtonColor = false,
+    }, panel)
+    win:_track(header, "TextColor3", "Accent")
+    local body = create("Frame", {
+        Position = UDim2.new(0, 0, 0, 34),
+        Size = UDim2.new(1, 0, 1, -34),
+        BackgroundTransparency = 1,
+    }, panel)
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local startMouse, startPos = input.Position, panel.Position
+            win.ActiveDrag = function(move)
+                local d = move.Position - startMouse
+                local k = 1 / (win.ScaleValue or 1)
+                panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X * k, startPos.Y.Scale, startPos.Y.Offset + d.Y * k)
+            end
+        end
+    end)
+    local function resize()
+        local maxH = math.max(140, (win.Gui.AbsoluteSize.Y - 80) / (win.ScaleValue or 1))
+        panel.Size = UDim2.fromOffset(190, math.min(34 + layout.AbsoluteContentSize.Y + 16, maxH))
+    end
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(resize)
+    tab.Panel, tab.Body, tab.Resize = panel, body, resize
+
+    local function select()
+        win.CurrentTab = tab
+        if win.Style == 3 then return end
+        for _, t in ipairs(win.Tabs) do
+            local active = t == tab
+            t.Page.Visible = active
+            t.Button.BackgroundTransparency = active and 0 or 1
+            t.Button.TextColor3 = active and Color3.new(1, 1, 1) or win.Colors.SubText
+        end
+    end
+    btn.MouseButton1Click:Connect(select)
+    tab.Select = select
+    if #win.Tabs == 1 then select() end
+
+    win:_track(btn, "BackgroundColor3", "Accent")
+    win:SetStyle(win.Style)
+    return tab
+end
+
+-- ---------- 3 kiểu giao diện ----------
+Lib.StyleNames = {"Sidebar", "Top Tabs", "Click GUI"}
+
+function Lib:SetStyle(style)
+    if type(style) == "string" then
+        for i, n in ipairs(Lib.StyleNames) do
+            if n == style then style = i end
+        end
+    end
+    if type(style) ~= "number" then return end
+    style = math.clamp(math.floor(style), 1, 3)
+    self.Style = style
+
+    local side = self.Sidebar
+    if style == 1 then
+        side.Visible = true
+        side.Position, side.Size = UDim2.new(0, 0, 0, 38), UDim2.new(0, 130, 1, -38)
+        side.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        side.ScrollingDirection = Enum.ScrollingDirection.Y
+        self.SideLayout.FillDirection = Enum.FillDirection.Vertical
+        self.Pages.Position, self.Pages.Size = UDim2.new(0, 130, 0, 38), UDim2.new(1, -130, 1, -38)
+    elseif style == 2 then
+        side.Visible = true
+        side.Position, side.Size = UDim2.new(0, 0, 0, 38), UDim2.new(1, 0, 0, 38)
+        side.AutomaticCanvasSize = Enum.AutomaticSize.X
+        side.ScrollingDirection = Enum.ScrollingDirection.X
+        self.SideLayout.FillDirection = Enum.FillDirection.Horizontal
+        self.Pages.Position, self.Pages.Size = UDim2.new(0, 0, 0, 76), UDim2.new(1, 0, 1, -76)
+    else
+        side.Visible = false
+    end
+
+    for i, tab in ipairs(self.Tabs) do
+        if style == 3 then
+            tab.Button.Visible = false
+            tab.Page.Parent = tab.Body
+            tab.Page.Size = UDim2.new(1, 0, 1, 0)
+            tab.Page.Visible = true
+            tab.Panel.Position = UDim2.fromOffset(20 + (i - 1) * 202, 50)
+            tab.Panel.Visible = true
+            tab.Resize()
+        else
+            tab.Panel.Visible = false
+            tab.Button.Visible = true
+            tab.Button.Size = (style == 1) and UDim2.new(1, 0, 0, 30) or UDim2.new(0, 96, 0, 28)
+            tab.Page.Parent = self.Pages
+            tab.Page.Size = UDim2.new(1, 0, 1, 0)
+        end
+    end
+
+    if style ~= 3 then
+        local cur = self.CurrentTab or self.Tabs[1]
+        if cur then cur.Select() end
+    end
+    self.StyleBtn.Text = "UI: " .. Lib.StyleNames[style] .. "  ⇄"
+    self:_updateVisible()
+    if self.OnStyle then task.spawn(self.OnStyle, style) end
+end
+
+local function nextOrder(tab)
+    tab.Order += 1
+    return tab.Order
+end
+
+local function baseRow(tab, height)
+    local win = tab.Window
+    local row = create("Frame", {
+        Size = UDim2.new(1, 0, 0, height),
+        BackgroundColor3 = win.Colors.Element,
+        BorderSizePixel = 0,
+        LayoutOrder = nextOrder(tab),
+    }, tab.Page)
+    corner(row, 6)
+    win:_track(row, "BackgroundColor3", "Element")
+    return row
+end
+
+local function rowLabel(win, row, text, widthScale)
+    return create("TextLabel", {
+        Size = UDim2.new(widthScale or 0.6, -12, 1, 0),
+        Position = UDim2.new(0, 12, 0, 0),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = win.Colors.Text,
+        TextSize = 13,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, row)
+end
+
+local function addRefresher(win, fn)
+    win.Refreshers = win.Refreshers or {}
+    table.insert(win.Refreshers, fn)
+end
+
+-- ---------- Elements ----------
+function Tab:AddSection(text)
+    local win = self.Window
+    local l = create("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 22),
+        BackgroundTransparency = 1,
+        Text = string.upper(text),
+        TextColor3 = win.Colors.Accent,
+        TextSize = 12,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        LayoutOrder = nextOrder(self),
+    }, self.Page)
+    win:_track(l, "TextColor3", "Accent")
+    return l
+end
+
+function Tab:AddLabel(text)
+    local win = self.Window
+    local l = create("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 20),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = win.Colors.SubText,
+        TextSize = 12,
+        Font = Enum.Font.Gotham,
+        TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        LayoutOrder = nextOrder(self),
+    }, self.Page)
+    return {Set = function(_, t) l.Text = t end, Instance = l}
+end
+
+function Tab:AddButton(o)
+    local win = self.Window
+    local b = create("TextButton", {
+        Size = UDim2.new(1, 0, 0, 32),
+        BackgroundColor3 = win.Colors.Element,
+        BorderSizePixel = 0,
+        Text = o.Name or "Button",
+        TextColor3 = o.Color or win.Colors.Text,
+        TextSize = 13,
+        Font = Enum.Font.GothamMedium,
+        AutoButtonColor = true,
+        LayoutOrder = nextOrder(self),
+    }, self.Page)
+    corner(b, 6)
+    win:_track(b, "BackgroundColor3", "Element")
+    b.MouseButton1Click:Connect(function()
+        if o.Callback then task.spawn(o.Callback, b) end
+    end)
+    return {Instance = b, SetText = function(_, t) b.Text = t end}
+end
+
+function Tab:AddToggle(o)
+    local win = self.Window
+    local row = baseRow(self, 34)
+    rowLabel(win, row, o.Name or "Toggle", 0.75)
+
+    local pill = create("Frame", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Size = UDim2.fromOffset(34, 18),
+        Position = UDim2.new(1, -10, 0.5, 0),
+        BorderSizePixel = 0,
+    }, row)
+    corner(pill, 9)
+    local dot = create("Frame", {Size = UDim2.fromOffset(14, 14), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0}, pill)
+    corner(dot, 7)
+
+    local state = o.Default and true or false
+    local obj = {}
+
+    local function visual(animate)
+        local info = TweenInfo.new(animate and 0.15 or 0)
+        TS:Create(pill, info, {BackgroundColor3 = state and win.Colors.Accent or win.Colors.Off}):Play()
+        TS:Create(dot, info, {Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)}):Play()
+    end
+
+    function obj:Set(v, silent)
+        v = v and true or false
+        if v == state then return end
+        state = v
+        if o.Flag then win.Flags[o.Flag] = state end
+        visual(true)
+        if o.Callback and not silent then task.spawn(o.Callback, state) end
+    end
+    function obj:Get() return state end
+
+    local hit = create("TextButton", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = ""}, row)
+    hit.MouseButton1Click:Connect(function() obj:Set(not state) end)
+
+    win:_register(o.Flag, state, function(v) obj:Set(v) end)
+    addRefresher(win, function() visual(false) end)
+    visual(false)
+    if state and o.Callback then task.spawn(o.Callback, state) end
+    return obj
+end
+
+function Tab:AddSlider(o)
+    local win = self.Window
+    local min, max = o.Min or 0, o.Max or 100
+    local inc = o.Increment or 1
+    local row = baseRow(self, 48)
+    rowLabel(win, row, o.Name or "Slider", 0.6).Position = UDim2.new(0, 12, 0, 4)
+    row:FindFirstChildOfClass("TextLabel").Size = UDim2.new(0.6, -12, 0, 22)
+
+    local valueLabel = create("TextLabel", {
+        Size = UDim2.new(0.4, -12, 0, 22),
+        Position = UDim2.new(0.6, 0, 0, 4),
+        BackgroundTransparency = 1,
+        TextColor3 = win.Colors.SubText,
+        TextSize = 12,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Right,
+    }, row)
+    create("UIPadding", {PaddingRight = UDim.new(0, 12)}, valueLabel)
+
+    local track = create("Frame", {
+        Position = UDim2.new(0, 12, 0, 34),
+        Size = UDim2.new(1, -24, 0, 4),
+        BackgroundColor3 = win.Colors.Off,
+        BorderSizePixel = 0,
+    }, row)
+    corner(track, 2)
+    local fill = create("Frame", {Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = win.Colors.Accent, BorderSizePixel = 0}, track)
+    corner(fill, 2)
+    win:_track(fill, "BackgroundColor3", "Accent")
+    local knob = create("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Size = UDim2.fromOffset(10, 10),
+        Position = UDim2.new(0, 0, 0.5, 0),
+        BackgroundColor3 = Color3.new(1, 1, 1),
+        BorderSizePixel = 0,
+    }, track)
+    corner(knob, 5)
+
+    local value = math.clamp(o.Default or min, min, max)
+    local obj = {}
+
+    local function visual()
+        local pos = (max == min) and 0 or math.clamp((value - min) / (max - min), 0, 1)
+        fill.Size = UDim2.new(pos, 0, 1, 0)
+        knob.Position = UDim2.new(pos, 0, 0.5, 0)
+        valueLabel.Text = tostring(value) .. (o.Suffix or "")
+    end
+
+    function obj:Set(v, silent)
+        v = math.clamp(math.floor(v / inc + 0.5) * inc, min, max)
+        if inc < 1 then v = tonumber(string.format("%.3f", v)) end
+        if v == value then return end
+        value = v
+        if o.Flag then win.Flags[o.Flag] = value end
+        visual()
+        if o.Callback and not silent then task.spawn(o.Callback, value) end
+    end
+    function obj:Get() return value end
+
+    local function fromInput(input)
+        local rel = math.clamp((input.Position.X - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1), 0, 1)
+        obj:Set(min + (max - min) * rel)
+    end
+
+    local hit = create("TextButton", {
+        Position = UDim2.new(0, 8, 0, 26),
+        Size = UDim2.new(1, -16, 0, 20),
+        BackgroundTransparency = 1,
+        Text = "",
+    }, row)
+    hit.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            win.ActiveDrag = fromInput
+            fromInput(input)
+        end
+    end)
+
+    win:_register(o.Flag, value, function(v) obj:Set(v) end)
+    visual()
+    return obj
+end
+
+function Tab:AddDropdown(o)
+    local win = self.Window
+    local options = o.Options or {}
+
+    local container = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = win.Colors.Element,
+        BorderSizePixel = 0,
+        LayoutOrder = nextOrder(self),
+    }, self.Page)
+    corner(container, 6)
+    win:_track(container, "BackgroundColor3", "Element")
+    create("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder}, container)
+
+    local header = create("TextButton", {
+        Size = UDim2.new(1, 0, 0, 34),
+        BackgroundTransparency = 1,
+        Text = "",
+        LayoutOrder = 0,
+    }, container)
+    rowLabel(win, header, o.Name or "Dropdown", 0.5)
+    local current = create("TextLabel", {
+        Size = UDim2.new(0.5, -12, 1, 0),
+        Position = UDim2.new(0.5, 0, 0, 0),
+        BackgroundTransparency = 1,
+        TextColor3 = win.Colors.Accent,
+        TextSize = 12,
+        Font = Enum.Font.GothamMedium,
+        TextXAlignment = Enum.TextXAlignment.Right,
+    }, header)
+    win:_track(current, "TextColor3", "Accent")
+
+    local list = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Visible = false,
+        LayoutOrder = 1,
+    }, container)
+    create("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder}, list)
+
+    local value = o.Default or options[1]
+    local obj = {}
+    local optionButtons = {}
+
+    local function visual()
+        current.Text = tostring(value) .. "  ▾"
+        for name, b in pairs(optionButtons) do
+            b.TextColor3 = (name == value) and win.Colors.Accent or win.Colors.SubText
+        end
+    end
+
+    function obj:Set(v, silent)
+        if v == value then return end
+        value = v
+        if o.Flag then win.Flags[o.Flag] = value end
+        visual()
+        if o.Callback and not silent then task.spawn(o.Callback, value) end
+    end
+    function obj:Get() return value end
+
+    function obj:SetOptions(newOptions)
+        options = newOptions
+        for _, b in pairs(optionButtons) do b:Destroy() end
+        optionButtons = {}
+        for i, opt in ipairs(options) do
+            local b = create("TextButton", {
+                Size = UDim2.new(1, 0, 0, 26),
+                BackgroundTransparency = 1,
+                Text = tostring(opt),
+                TextSize = 12,
+                Font = Enum.Font.Gotham,
+                LayoutOrder = i,
+            }, list)
+            optionButtons[opt] = b
+            b.MouseButton1Click:Connect(function()
+                obj:Set(opt)
+                list.Visible = false
+            end)
+        end
+        visual()
+    end
+
+    header.MouseButton1Click:Connect(function() list.Visible = not list.Visible end)
+
+    obj:SetOptions(options)
+    win:_register(o.Flag, value, function(v) obj:Set(v) end)
+    addRefresher(win, visual)
+    return obj
+end
+
+function Tab:AddTextBox(o)
+    local win = self.Window
+    local row = baseRow(self, 36)
+    rowLabel(win, row, o.Name or "TextBox", 0.4)
+
+    local box = create("TextBox", {
+        Size = UDim2.new(0.6, -18, 0, 24),
+        Position = UDim2.new(0.4, 6, 0.5, -12),
+        BackgroundColor3 = win.Colors.Off,
+        BorderSizePixel = 0,
+        Text = tostring(o.Default or ""),
+        PlaceholderText = o.Placeholder or "",
+        PlaceholderColor3 = win.Colors.SubText,
+        TextColor3 = win.Colors.Text,
+        TextSize = 12,
+        Font = Enum.Font.Gotham,
+        ClearTextOnFocus = false,
+    }, row)
+    corner(box, 4)
+
+    local obj = {}
+    function obj:Set(v, silent)
+        box.Text = tostring(v)
+        if o.Flag then win.Flags[o.Flag] = box.Text end
+        if o.Callback and not silent then task.spawn(o.Callback, box.Text) end
+    end
+    function obj:Get() return box.Text end
+
+    box.FocusLost:Connect(function(enter)
+        if o.Flag then win.Flags[o.Flag] = box.Text end
+        if o.Callback then task.spawn(o.Callback, box.Text, enter) end
+    end)
+
+    win:_register(o.Flag, box.Text, function(v) obj:Set(v) end)
+    return obj
+end
+
+function Tab:AddKeybind(o)
+    local win = self.Window
+    local row = baseRow(self, 34)
+    rowLabel(win, row, o.Name or "Keybind", 0.6)
+
+    local btn = create("TextButton", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Size = UDim2.fromOffset(86, 22),
+        Position = UDim2.new(1, -10, 0.5, 0),
+        BackgroundColor3 = win.Colors.Off,
+        BorderSizePixel = 0,
+        TextColor3 = win.Colors.Text,
+        TextSize = 12,
+        Font = Enum.Font.GothamMedium,
+        AutoButtonColor = false,
+    }, row)
+    corner(btn, 4)
+
+    local key = o.Default
+    local obj = {}
+    local bind = {key = key, fire = function() if o.Callback then o.Callback() end end}
+    table.insert(win.Binds, bind)
+
+    local function visual()
+        btn.Text = key and key.Name or "None"
+    end
+
+    function obj:Set(k)
+        key = k
+        bind.key = k
+        if o.Flag then win.Flags[o.Flag] = k end
+        visual()
+        if o.OnChanged then o.OnChanged(k) end
+    end
+    function obj:Get() return key end
+
+    btn.MouseButton1Click:Connect(function()
+        btn.Text = "..."
+        win.Listening = function(k)
+            if k == Enum.KeyCode.Escape or k == Enum.KeyCode.Backspace then
+                obj:Set(nil)
+            elseif k ~= win.ToggleKey then
+                obj:Set(k)
+            else
+                visual()
+            end
+        end
+    end)
+
+    win:_register(o.Flag, key, function(v) obj:Set(v) end)
+    visual()
+    return obj
+end
+
+return Lib
+
+end)()
+
 -- ===== CLICKGUI: panel nhiều cột (RightShift để ẩn/hiện) =====
-do
+;(function()
     local COLORS = {
         panel = Color3.fromRGB(26, 26, 30),
         settings = Color3.fromRGB(34, 34, 39),
@@ -4655,6 +6055,7 @@ do
     local HttpService = game:GetService("HttpService")
 
     local THEMES = {
+        {name = "Kicia Teal", color = Color3.fromRGB(120, 205, 222)},
         {name = "Blue", color = Color3.fromRGB(84, 112, 255)},
         {name = "Purple", color = Color3.fromRGB(150, 90, 255)},
         {name = "Red", color = Color3.fromRGB(235, 70, 80)},
@@ -4664,13 +6065,14 @@ do
         {name = "Cyan", color = Color3.fromRGB(0, 190, 230)},
     }
     local BACKGROUNDS = {
+        {name = "Kicia Black", panel = Color3.fromRGB(0, 0, 0), settings = Color3.fromRGB(18, 18, 21)},
         {name = "Dark", panel = Color3.fromRGB(26, 26, 30), settings = Color3.fromRGB(34, 34, 39)},
         {name = "Black", panel = Color3.fromRGB(10, 10, 12), settings = Color3.fromRGB(20, 20, 23)},
         {name = "Navy", panel = Color3.fromRGB(18, 22, 38), settings = Color3.fromRGB(26, 32, 52)},
         {name = "Gray", panel = Color3.fromRGB(48, 48, 54), settings = Color3.fromRGB(60, 60, 68)},
     }
 
-    local PANEL_STYLES = {{name = "Click GUI"}, {name = "Classic"}}
+    local PANEL_STYLES = {{name = "Click GUI"}, {name = "Classic"}, {name = "KhangUI: Sidebar"}, {name = "KhangUI: Top Tabs"}, {name = "KhangUI: Panels"}}
     local UI_DEFAULTS = {PanelStyle = 1, ThemeIndex = 1, BgIndex = 1, PanelScale = 100, PanelTransparency = 5, PanelCorner = 14}
     for key, value in pairs(UI_DEFAULTS) do
         if Features[key] == nil then Features[key] = value end
@@ -4743,13 +6145,19 @@ do
 
     -- Chọn giữa Click GUI (panel nhiều cột) và Classic (menu danh sách cũ)
     local menuOpen = true
+    local khangWin, khangUpdate, khangSync, khangSyncKey, StyleCycle, classicScale
     local function updateMenus()
-        local classic = Features.PanelStyle == 2
-        ClickGui.Visible = menuOpen and not classic
-        MainFrame.Visible = menuOpen and classic
-        if classic then
+        local style = Features.PanelStyle
+        ClickGui.Visible = menuOpen and style == 1
+        MainFrame.Visible = menuOpen and style == 2
+        if khangUpdate then khangUpdate(menuOpen and style >= 3, style) end
+        if StyleCycle then
+            StyleCycle.Visible = menuOpen
+            StyleCycle.Text = "UI: " .. PANEL_STYLES[style].name .. "  ⇄"
+        end
+        if style == 2 then
             for _, fn in ipairs(LegacySync) do pcall(fn) end
-        else
+        elseif style == 1 then
             for key in pairs(refreshers) do refresh(key) end
         end
     end
@@ -4771,6 +6179,7 @@ do
         for _, item in ipairs(themed) do
             pcall(function() item.obj[item.prop] = COLORS[item.colorKey] end)
         end
+        if khangWin then pcall(function() khangWin:SetColors({Accent = COLORS.accent, Background = COLORS.panel, Sidebar = COLORS.settings, Element = COLORS.settings}) end) end
         for key in pairs(refreshers) do refresh(key) end
     end
 
@@ -4793,6 +6202,8 @@ do
         BgIndex = function() applyTheme() end,
         PanelScale = function(value)
             for _, p in ipairs(panels) do p.scale.Scale = value / 100 end
+            if classicScale then classicScale.Scale = value / 100 end
+            if khangWin then pcall(function() khangWin:SetScale(value / 100) end) end
             relayout()
         end,
         PanelTransparency = function(value)
@@ -4837,6 +6248,7 @@ do
         local cb = onChange[key]
         if cb then task.spawn(cb, value) end
         refresh(key)
+        if khangSyncKey then khangSyncKey(key) end
         if UI_DEFAULTS[key] ~= nil then saveUI() end
     end
 
@@ -5240,6 +6652,7 @@ do
                 {type = "slider", name = "Aim Offset", key = "AimOffset", min = -10, max = 10},
                 {type = "toggle", name = "Wall Check", key = "SilentWallCheck"},
                 {type = "toggle", name = "AutoFire", key = "SilentAutoFire"},
+                {type = "cycle", name = "Hook", key = "SilentHook", options = Custom.HOOK_MODES},
                 {type = "toggle", name = "Debug Log (F9)", key = "SilentDebug"},
             }},
             {name = "Aim Lock", key = "AimLock", settings = {
@@ -5260,6 +6673,11 @@ do
                 {type = "toggle", name = "Wall Check", key = "RageWallCheck"},
                 {type = "toggle", name = "Snap Camera", key = "RageSnap"},
                 {type = "toggle", name = "Anti Aim", key = "RageAntiAim"},
+                {type = "toggle", name = "Chỉ chạy khi chuột khóa (trong trận)", key = "RageNeedMouseLock"},
+            }},
+            {name = "Target Info (HP)", key = "ShowTargetInfo"},
+            {name = "Target Filter", settings = {
+                {type = "slider", name = "Chỉ nhắm HP <= %", key = "TargetHPMax", min = 1, max = 100},
             }},
             {name = "Team Check", key = "TeamCheck"},
         }},
@@ -5269,6 +6687,7 @@ do
                 {type = "toggle", name = "Tracers", key = "ShowTracer"},
                 {type = "toggle", name = "Head Dot", key = "ShowHeadDot"},
                 {type = "toggle", name = "Info Text", key = "ShowInfo"},
+                {type = "toggle", name = "Health Bar", key = "ShowHealthBar"},
                 {type = "slider", name = "Max Distance", key = "MaxDistance", min = 100, max = 2000},
             }},
             {name = "Chams", key = "Chams"},
@@ -5279,7 +6698,33 @@ do
             {name = "Third Person", key = "ThirdPerson", settings = {
                 {type = "slider", name = "Distance", key = "TPDistance", min = 2, max = 50},
             }},
-            {name = "Texture Pack", key = "TexturePack"},
+            {name = "Texture Pack", key = "TexturePack", settings = {
+                {type = "toggle", name = "UI Images", key = "TexUI"},
+                {type = "toggle", name = "Rank Icons", key = "TexRanks"},
+                {type = "toggle", name = "Kill Sounds", key = "TexKillSounds"},
+                {type = "toggle", name = "Match Sounds (win/lose)", key = "TexMatchSounds"},
+                {type = "toggle", name = "Movement Sounds", key = "TexMoveSounds"},
+                {type = "toggle", name = "Menu Sounds", key = "TexMenuSounds"},
+                {type = "toggle", name = "Other Sounds", key = "TexOtherSounds"},
+            }},
+            {name = "Map Texture", key = "MapTexture", settings = {
+                {type = "textbox", name = "Image ID / URL", key = "MapTextureSource", placeholder = "123456 hoặc https://..."},
+                {type = "cycle", name = "Material", key = "MapMaterialIndex", options = Custom.MAP_MATERIALS},
+            }},
+            {name = "Dash Sound", key = "DashSound", settings = {
+                {type = "cycle", name = "Sound", key = "DashSoundIndex", options = Custom.SOUND_PRESETS},
+                {type = "textbox", name = "Custom ID / URL", key = "DashSoundCustom", placeholder = "chọn Sound = Custom"},
+                {type = "slider", name = "Volume %", key = "DashVolume", min = 0, max = 100},
+                {type = "slider", name = "Sensitivity (thấp = nhạy)", key = "DashSens", min = 10, max = 100},
+                {type = "button", name = "Test Sound", action = function() Custom.testDashSound() end},
+            }},
+            {name = "Double Jump Sound", key = "DoubleJumpSound", settings = {
+                {type = "cycle", name = "Sound", key = "DoubleJumpSoundIndex", options = Custom.SOUND_PRESETS},
+                {type = "textbox", name = "Custom ID / URL", key = "DoubleJumpSoundCustom", placeholder = "chọn Sound = Custom"},
+                {type = "slider", name = "Volume %", key = "DJVolume", min = 0, max = 100},
+                {type = "slider", name = "Sensitivity (thấp = nhạy)", key = "DJSens", min = 5, max = 60},
+                {type = "button", name = "Test Sound", action = function() Custom.testJumpSound() end},
+            }},
             {name = "Map Darkener", key = "MapDarkener", settings = {
                 {type = "slider", name = "Darkness", key = "Darkness", min = 1, max = 10},
             }},
@@ -5306,8 +6751,6 @@ do
                 {type = "toggle", name = "Unlock Skins", key = "UnlockSkin"},
                 {type = "toggle", name = "Unlock Wraps", key = "UnlockWrap"},
                 {type = "toggle", name = "Unlock Charms", key = "UnlockCharm"},
-                {type = "toggle", name = "Unlock Finishers", key = "UnlockFinisher"},
-                {type = "toggle", name = "Unlock Emotes", key = "UnlockEmote"},
                 {type = "cycle", name = "Rarity", key = "UnlockRarity", options = Custom.rarityOptions},
                 {type = "toggle", name = "Debug Log (F9)", key = "SkinDebug"},
             }},
@@ -5391,7 +6834,7 @@ do
                 {type = "cycle", name = "Panel Style", key = "PanelStyle", options = PANEL_STYLES},
                 {type = "cycle", name = "Theme", key = "ThemeIndex", options = THEMES},
                 {type = "cycle", name = "Background", key = "BgIndex", options = BACKGROUNDS},
-                {type = "slider", name = "Panel Size %", key = "PanelScale", min = 70, max = 150},
+                {type = "slider", name = "Panel Size %", key = "PanelScale", min = 50, max = 160},
                 {type = "slider", name = "Transparency %", key = "PanelTransparency", min = 0, max = 60},
                 {type = "slider", name = "Corner Radius", key = "PanelCorner", min = 0, max = 20},
                 {type = "button", name = "Reset Layout", action = function() relayout() end},
@@ -5509,37 +6952,209 @@ do
 
     -- Menu Classic: nút chuyển sang Click GUI ngay trên thanh tiêu đề + chiều cao theo màn hình
     MainFrame.Size = UDim2.new(0, 320, 0, math.min(480, Camera.ViewportSize.Y - 100))
+    classicScale = new("UIScale", {Scale = Features.PanelScale / 100}, MainFrame)
     local SwitchToClick = new("TextButton", {
         Position = UDim2.new(1, -150, 0, 5),
         Size = UDim2.new(0, 105, 0, 30),
         BackgroundColor3 = Color3.fromRGB(50, 80, 170),
         BorderSizePixel = 0,
-        Text = "Click GUI  ⇄",
+        Text = "Đổi UI  ⇄",
         TextColor3 = Color3.fromRGB(255, 255, 255),
         TextSize = 12,
         Font = Enum.Font.GothamBold,
     }, TitleBar)
     new("UICorner", {CornerRadius = UDim.new(0, 6)}, SwitchToClick)
     SwitchToClick.MouseButton1Click:Connect(function()
-        setFeature("PanelStyle", 1)
+        setFeature("PanelStyle", (Features.PanelStyle % #PANEL_STYLES) + 1)
     end)
+
+    -- ---------- Nút đổi UI chung + giao diện KhangUI (dựng từ chính bảng Layout ở trên) ----------
+    SwitchToClassic.Visible = false -- thay bằng nút đổi UI chung bên dưới
+    StyleCycle = new("TextButton", {
+        AnchorPoint = Vector2.new(0.5, 0),
+        Position = UDim2.new(0.5, 0, 0, 6),
+        Size = UDim2.new(0, 230, 0, 28),
+        BackgroundColor3 = COLORS.panel,
+        BackgroundTransparency = 0.1,
+        BorderSizePixel = 0,
+        TextColor3 = COLORS.text,
+        TextSize = 13,
+        Font = Enum.Font.GothamMedium,
+        ZIndex = 60,
+    }, ScreenGui)
+    new("UICorner", {CornerRadius = UDim.new(0, 8)}, StyleCycle)
+    track(StyleCycle, "BackgroundColor3", "panel")
+    StyleCycle.MouseButton1Click:Connect(function()
+        setFeature("PanelStyle", (Features.PanelStyle % #PANEL_STYLES) + 1)
+    end)
+
+    local KhangModal = new("Frame", {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1, Visible = false}, ScreenGui)
+    new("TextButton", {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1, Text = "", Modal = true}, KhangModal)
+
+    local khangElements, khangBinds = {}, {}
+    local khangBuilding, khangBuilt = true, false
+
+    local function khNames(options)
+        local list = {}
+        for i, option in ipairs(options) do list[i] = option.name end
+        return list
+    end
+
+    local function khRegister(key, kind, obj, st)
+        khangElements[key] = khangElements[key] or {}
+        table.insert(khangElements[key], {kind = kind, obj = obj, st = st})
+    end
+
+    local function khAdd(tab, st)
+        local key = st.key
+        if st.type == "slider" then
+            khRegister(key, "slider", tab:AddSlider({
+                Name = st.name, Min = st.min, Max = st.max,
+                Default = math.clamp(Features[key] or st.min, st.min, st.max),
+                Callback = function(v) if not khangBuilding then setFeature(key, v) end end,
+            }), st)
+        elseif st.type == "cycle" then
+            local list = khNames(st.options)
+            khRegister(key, "cycle", tab:AddDropdown({
+                Name = st.name, Options = list, Default = list[Features[key]] or list[1],
+                Callback = function(chosen)
+                    if khangBuilding then return end
+                    for i, option in ipairs(st.options) do
+                        if option.name == chosen then setFeature(key, i) break end
+                    end
+                end,
+            }), st)
+        elseif st.type == "button" then
+            tab:AddButton({Name = st.name, Callback = function() st.action() end})
+        elseif st.type == "textbox" then
+            khRegister(key, "textbox", tab:AddTextBox({
+                Name = st.name, Placeholder = st.placeholder, Default = tostring(Features[key] or ""),
+                Callback = function(text) if not khangBuilding then setFeature(key, text) end end,
+            }), st)
+        else
+            khRegister(key, "toggle", tab:AddToggle({
+                Name = st.name, Default = Features[key] and true or false,
+                Callback = function(v) if not khangBuilding then setFeature(key, v) end end,
+            }), st)
+        end
+    end
+
+    khangSyncKey = function(key)
+        local list = khangElements[key]
+        if not list then return end
+        local was = khangBuilding
+        khangBuilding = true
+        for _, e in ipairs(list) do
+            pcall(function()
+                if e.kind == "toggle" then
+                    e.obj:Set(Features[key] and true or false, true)
+                elseif e.kind == "slider" then
+                    e.obj:Set(Features[key] or e.st.min, true)
+                elseif e.kind == "cycle" then
+                    local names = khNames(e.st.options)
+                    e.obj:SetOptions(names)
+                    e.obj:Set(names[Features[key]] or names[1], true)
+                elseif e.kind == "textbox" then
+                    e.obj:Set(tostring(Features[key] or ""), true)
+                end
+            end)
+        end
+        khangBuilding = was
+    end
+
+    khangSync = function()
+        for key in pairs(khangElements) do khangSyncKey(key) end
+        local was = khangBuilding
+        khangBuilding = true
+        for mod, kb in pairs(khangBinds) do pcall(function() kb:Set(mod.bind) end) end
+        khangBuilding = was
+    end
+
+    local function buildKhang(style)
+        khangBuilt = true
+        khangBuilding = true
+        local ok, err = pcall(function()
+            khangWin = KhangUILib.new({
+                Title = "Khang Hub", Style = style - 2, Accent = COLORS.accent,
+                Colors = {Background = COLORS.panel, Sidebar = COLORS.settings, Element = COLORS.settings, Off = Color3.fromRGB(50, 50, 56)},
+                ToggleKey = false, HideStyleButton = true,
+            })
+            khangWin:SetScale(Features.PanelScale / 100)
+            for _, cat in ipairs(Layout) do
+                local tab = khangWin:AddTab(cat.name)
+                for _, mod in ipairs(cat.modules) do
+                    if mod.key then
+                        if mod.settings then
+                            tab:AddSection(mod.name)
+                            khAdd(tab, {type = "toggle", name = "Enabled", key = mod.key})
+                            for _, st in ipairs(mod.settings) do khAdd(tab, st) end
+                        else
+                            khAdd(tab, {type = "toggle", name = mod.name, key = mod.key})
+                        end
+                        -- Phím tắt dùng chung với hệ thống Bind của UI cũ (mod.bind)
+                        khangBinds[mod] = tab:AddKeybind({
+                            Name = mod.settings and "Bind" or (mod.name .. " bind"),
+                            Default = mod.bind,
+                            OnChanged = function(k)
+                                mod.bind = k
+                                if mod.bindButton then mod.bindButton.Text = k and ("Bind: " .. k.Name) or "Bind: None" end
+                            end,
+                        })
+                    elseif mod.settings then
+                        tab:AddSection(mod.name)
+                        for _, st in ipairs(mod.settings) do khAdd(tab, st) end
+                    elseif mod.action then
+                        tab:AddButton({Name = mod.name, Color = mod.color, Callback = function(btn) mod.action(btn) end})
+                    end
+                end
+            end
+        end)
+        khangBuilding = false
+        if not ok then
+            warn("[Khang Hub] KhangUI error: " .. tostring(err))
+            showNotification("KhangUI", "Lỗi dựng giao diện, xem F9", 5)
+        end
+    end
+
+    khangUpdate = function(show, style)
+        if show and not khangBuilt then buildKhang(style) end
+        if khangWin then
+            if show then
+                khangWin:SetStyle(style - 2)
+                khangSync()
+            end
+            khangWin:SetVisible(show)
+        end
+        KhangModal.Visible = show
+    end
+
+    Custom.khangVisible = function() return khangWin ~= nil and khangWin.Shown end
+    Custom.setUIScale = function(v) setFeature("PanelScale", v) end
+
+    local origUnload = unloadHub
+    unloadHub = function()
+        origUnload()
+        pcall(function() if khangWin then khangWin:Destroy() end end)
+    end
 
     relayout()
     updateMenus()
 
     Custom.emoteStateChanged = function()
         refresh("EmotePlay")
+        if khangSyncKey then khangSyncKey("EmotePlay") end
         for _, fn in ipairs(LegacySync) do pcall(fn) end
     end
 
     -- Đồng bộ lại cả hai kiểu menu sau khi nạp cấu hình
     Custom.menuVisible = function()
-        return ClickGui.Visible or MainFrame.Visible
+        return ClickGui.Visible or MainFrame.Visible or Custom.khangVisible()
     end
 
     Custom.syncUI = function()
         for _, fn in ipairs(LegacySync) do pcall(fn) end
         for key in pairs(refreshers) do refresh(key) end
+        if khangSync then pcall(khangSync) end
     end
 
     -- Lưu / nạp phím tắt (Bind) của từng module
@@ -5593,7 +7208,7 @@ do
         if gameProcessed then return end
 
         if input.KeyCode == Enum.KeyCode.RightShift then
-            menuOpen = not (ClickGui.Visible or MainFrame.Visible)
+            menuOpen = not (ClickGui.Visible or MainFrame.Visible or Custom.khangVisible())
             updateMenus()
             return
         end
@@ -5604,10 +7219,10 @@ do
             end
         end
     end)
-end
+end)()
 
 -- ===== CONFIG (lưu / nhớ cài đặt) + AUTO EXECUTE =====
-do
+;(function()
     local HttpService = game:GetService("HttpService")
     local CONFIG_DIR, CONFIG_FILE = "KhangHub", "KhangHub/config.json"
     -- Các key giao diện đã có file riêng (KhangHub_ui.json); EmotePlay chỉ là trạng thái tạm
@@ -5790,7 +7405,7 @@ do
     -- Chạy lại script (hoặc autoexec chạy trùng) sẽ tự gỡ bản cũ
     local env = (getgenv and getgenv()) or _G
     env.KhangHubUnload = function() unloadHub() end
-end
+end)()
 
 -- ===== ĐỒNG BỘ TRẠNG THÁI HIỆU ỨNG =====
 -- Nếu vì lý do nào đó nút đã tắt mà hiệu ứng vẫn chạy (hoặc ngược lại), tự đưa về đúng trạng thái của nút.
@@ -5803,6 +7418,7 @@ task.spawn(function()
         end
     end
 
+    local lastTexSig, lastMapSig = nil, nil
     while not khangUnloaded do
         task.wait(0.5)
         if khangUnloaded then break end
@@ -5815,6 +7431,25 @@ task.spawn(function()
         end
         if Custom.isSkyActive then
             reconcile(Features.SkyChanger and true or false, Custom.isSkyActive(), enableSky, disableSky)
+        end
+        if Custom.isMapTexActive then
+            reconcile(Features.MapTexture and true or false, Custom.isMapTexActive(), Custom.mapTexEnable, Custom.mapTexDisable)
+        end
+
+        -- Bật / tắt nhóm texture hoặc đổi nguồn / chất liệu map => áp dụng lại (dùng chung cho mọi kiểu UI)
+        local texSig = table.concat({
+            tostring(Features.TexUI), tostring(Features.TexRanks), tostring(Features.TexKillSounds),
+            tostring(Features.TexMatchSounds), tostring(Features.TexMoveSounds), tostring(Features.TexMenuSounds),
+            tostring(Features.TexOtherSounds),
+        }, ",")
+        if texSig ~= lastTexSig then
+            lastTexSig = texSig
+            if Custom.refreshTexturePack then pcall(Custom.refreshTexturePack) end
+        end
+        local mapSig = tostring(Features.MapTextureSource) .. "|" .. tostring(Features.MapMaterialIndex)
+        if mapSig ~= lastMapSig then
+            lastMapSig = mapSig
+            if Custom.mapTexRefresh then pcall(Custom.mapTexRefresh) end
         end
     end
 end)
@@ -5845,6 +7480,31 @@ task.spawn(function()
             end
         else
             ticks = 0
+        end
+    end
+end)
+
+-- ===== CHẨN ĐOÁN CRASH =====
+-- Mỗi khi danh sách tính năng đang bật thay đổi, ghi ra KhangHub/enabled_features.txt.
+-- Nếu game bị crash, mở file này để biết lúc đó đang bật những tính năng nào.
+task.spawn(function()
+    local last = ""
+    while not khangUnloaded do
+        task.wait(1)
+        if writefile then
+            local on = {}
+            for key, value in pairs(Features) do
+                if value == true then on[#on + 1] = key end
+            end
+            table.sort(on)
+            local text = table.concat(on, "\n")
+            if text ~= last then
+                last = text
+                pcall(function()
+                    if makefolder and isfolder and not isfolder("KhangHub") then makefolder("KhangHub") end
+                    writefile("KhangHub/enabled_features.txt", os.date("%H:%M:%S") .. "\n" .. text)
+                end)
+            end
         end
     end
 end)
