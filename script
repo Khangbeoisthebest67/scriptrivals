@@ -388,7 +388,20 @@ local Features = {
     DoubleJumpSoundIndex = 4,
     DoubleJumpSoundCustom = "",
     DJVolume = 60,
-    DJSens = 18
+    DJSens = 18,
+
+    -- Phương thức kéo ngắm: 1 = chuột (kéo cả súng), 2 = camera
+    AimMethod = 1,
+    MouseScale = 100,          -- pixel màn hình / 1 đơn vị chuột x100 (dùng nút Calibrate để đo tự động)
+
+    -- Rage Bot: tp tới địch, bắn, về chỗ cũ
+    RageTP = false,
+    RageTPDistance = 6,
+    RageTPHeight = 0,
+    RageTPShots = 2,
+    RageTPDelay = 120,
+
+    SilentSticky = true        -- giữ mục tiêu suốt lúc đang bắn, không bị rớt khi súng giật ra khỏi vòng FOV
 }
 
 -- Khai báo trước để nút trong menu gọi được
@@ -404,6 +417,7 @@ Custom.SILENT_MODES = {{name = "Raycast"}, {name = "Mouse"}, {name = "Both"}, {n
 Custom.RAGE_PRIORITY = {{name = "Closest"}, {name = "Lowest HP"}, {name = "Crosshair"}}
 Custom.QUALITY = {{name = "Low"}, {name = "Medium"}, {name = "High"}}
 Custom.HOOK_MODES = {{name = "Function (nhẹ)"}, {name = "Namecall"}}
+Custom.AIM_METHODS = {{name = "Mouse (kéo cả súng)"}, {name = "Camera"}}
 do
     local B = "https://raw.githubusercontent.com/prism658/Resources-fleasion/main/"
     Custom.SOUND_PRESETS = {
@@ -1692,6 +1706,12 @@ end)
 CreateSlider("Stickiness", 0, 100, 50, function(value)
     Features.AimbotSticky = value
 end, "AimbotSticky")
+CreateButton("Aim Method: " .. Custom.AIM_METHODS[1].name .. " (bấm để đổi)", function(btn)
+    Features.AimMethod = (Features.AimMethod % #Custom.AIM_METHODS) + 1
+    btn.Text = "Aim Method: " .. Custom.AIM_METHODS[Features.AimMethod].name
+end)
+CreateSlider("Mouse Scale", 5, 500, 100, function(value) Features.MouseScale = value end, "MouseScale")
+CreateButton("Calibrate Mouse (trong trận)", function() Custom.calibrateMouse() end)
 CreateToggle("Aim Range Circle", "AimbotShowCircle", true)
 CreateToggle("Show Target", "ShowTarget", false)
 CreateButton("Silent Mode: " .. Custom.SILENT_MODES[1].name .. " (bấm để đổi)", function(btn)
@@ -1713,6 +1733,7 @@ CreateSlider("Headshot Chance %", 0, 100, 100, function(value)
 end, "SilentHeadChance")
 CreateToggle("Silent Wall Check", "SilentWallCheck", true)
 CreateToggle("Silent AutoFire", "SilentAutoFire", false)
+CreateToggle("Silent: giữ mục tiêu khi bắn", "SilentSticky", true)
 CreateButton("Silent Hook: " .. Custom.HOOK_MODES[1].name .. " (bấm để đổi)", function(btn)
     Features.SilentHook = (Features.SilentHook % #Custom.HOOK_MODES) + 1
     btn.Text = "Silent Hook: " .. Custom.HOOK_MODES[Features.SilentHook].name
@@ -1750,6 +1771,11 @@ CreateToggle("Rage Wall Check", "RageWallCheck", true)
 CreateToggle("Rage Snap Camera", "RageSnap", false)
 CreateToggle("Rage Anti Aim", "RageAntiAim", false)
 CreateToggle("Rage: chỉ chạy khi chuột khóa", "RageNeedMouseLock", true)
+CreateToggle("Rage Teleport Shoot (tp bắn rồi về)", "RageTP", false)
+CreateSlider("TP Distance", 2, 30, 6, function(value) Features.RageTPDistance = value end, "RageTPDistance")
+CreateSlider("TP Height", 0, 15, 0, function(value) Features.RageTPHeight = value end, "RageTPHeight")
+CreateSlider("TP Shots / lượt", 1, 10, 2, function(value) Features.RageTPShots = value end, "RageTPShots")
+CreateSlider("TP Delay (ms)", 30, 1000, 120, function(value) Features.RageTPDelay = value end, "RageTPDelay")
 
 CreateSection("SHADER / SKY NÂNG CAO")
 CreateSlider("Clouds %", 0, 100, 0, function(value)
@@ -2121,11 +2147,21 @@ do
                         local d = (Vector2.new(sp.X, sp.Y) - center).Magnitude
                         local isLocked = (player == lockedPlayer)
                         local limit = isLocked and (lockFov or fov) or fov
-                        if d <= limit and (not wallCheck or isVisible(part, c)) then
+                        local usePart, visible = part, true
+                        if d <= limit and wallCheck then
+                            visible = isVisible(part, c)
+                            if not visible and kind == 1 then
+                                -- Đầu bị che nhưng thân còn thấy: vẫn nhắm vào thân thay vì bỏ mục tiêu
+                                local alt = getAimPart(c, 2)
+                                if alt and isVisible(alt, c) then usePart, visible = alt, true end
+                            end
+                        end
+                        if d <= limit and visible then
                             local score = isLocked and (d * 0.25) or d -- ưu tiên giữ mục tiêu đang khóa
                             if score < bestScore then
                                 bestScore = score
-                                best = {player = player, character = c, part = part, position = pos, distance = d}
+                                best = {player = player, character = c, part = usePart,
+                                    position = usePart.Position + Vector3.new(0, Features.AimOffset, 0), distance = d}
                             end
                         end
                     end
@@ -2154,7 +2190,7 @@ do
                 if hum and hum.Health > 0 and root and aim
                     and hum.Health / math.max(hum.MaxHealth, 1) * 100 <= Features.TargetHPMax then
                     local dist = (root.Position - myRoot.Position).Magnitude
-                    if dist <= Features.RageRange and (not Features.RageWallCheck or isVisible(aim, c)) then
+                    if dist <= Features.RageRange and (Features.RageTP or not Features.RageWallCheck or isVisible(aim, c)) then
                         local score
                         if Features.RagePriority == 2 then
                             score = hum.Health
@@ -2208,6 +2244,7 @@ do
     -- ---------- Silent Aim ----------
     local silentTarget = nil
     local decision = {time = 0, point = nil, part = nil}
+    local lastFireTime = 0
     local raycastHooked, mouseHooked, warnedNoHook = false, false, false
 
     local function updateSilentTarget()
@@ -2215,6 +2252,27 @@ do
             silentTarget = nil
             return
         end
+        local now = os.clock()
+        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then lastFireTime = now end
+
+        -- Súng giật làm tâm ngắm trôi ra khỏi vòng FOV sau vài viên đầu, mục tiêu bị rớt nên các viên sau
+        -- bắn thường. Khi đang bắn: giữ nguyên mục tiêu cho tới khi chết / quá tầm / bị che quá 0.35s.
+        local cur = silentTarget
+        if Features.SilentSticky and cur and now - lastFireTime < 0.6 and cur.character then
+            local hum = cur.character:FindFirstChildOfClass("Humanoid")
+            local root = cur.character:FindFirstChild("HumanoidRootPart")
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hum and hum.Health > 0 and root and cur.part.Parent and myRoot
+                and (root.Position - myRoot.Position).Magnitude <= Features.SilentRange then
+                if not Features.SilentWallCheck or isVisible(cur.part, cur.character) then
+                    cur.lostAt = nil
+                    return
+                end
+                cur.lostAt = cur.lostAt or now
+                if now - cur.lostAt < 0.35 then return end
+            end
+        end
+
         local scanKind = (Features.SilentPart == 1) and 1 or ((Features.SilentPart == 3) and 3 or 2)
         local target = findTarget(Features.SilentRange, Features.FOV, Features.SilentWallCheck, scanKind,
             silentTarget and silentTarget.player, Features.FOV * 1.15)
@@ -2267,7 +2325,8 @@ do
         ScreenPointToRay = true,
     }
     -- Thống kê để chẩn đoán: bật "Debug Log" trong Silent Aim, mở F9 để xem
-    local stats = {calls = 0, redirects = 0}
+    local stats = {calls = 0, redirects = 0, seen = 0}
+    local namecallInstalled, fireWatch = false, 0
 
     local function silentActive()
         return (Features.SilentAim or Features.RageBot) and silentTarget ~= nil
@@ -2278,8 +2337,8 @@ do
         if method == "Raycast" then
             local origin, direction = args[1], args[2]
             if typeof(origin) == "Vector3" and typeof(direction) == "Vector3"
-                and direction.Magnitude > 30
-                and (origin - Camera.CFrame.Position).Magnitude < 40 then
+                and direction.Magnitude > 12
+                and (origin - Camera.CFrame.Position).Magnitude < 70 then
                 stats.calls += 1
                 local point = silentPoint()
                 if point then
@@ -2291,8 +2350,8 @@ do
             end
         else
             local ray = args[1]
-            if typeof(ray) == "Ray" and ray.Direction.Magnitude > 30
-                and (ray.Origin - Camera.CFrame.Position).Magnitude < 40 then
+            if typeof(ray) == "Ray" and ray.Direction.Magnitude > 12
+                and (ray.Origin - Camera.CFrame.Position).Magnitude < 70 then
                 stats.calls += 1
                 local point = silentPoint()
                 if point then
@@ -2308,6 +2367,7 @@ do
 
     -- Hook __namecall: workspace:Raycast(...), FindPartOnRay*, Camera:ViewportPointToRay(...)
     local function installRaycastHook()
+        namecallInstalled = true
         local oldNamecall
         local handler = function(self, ...)
             local method = getnamecallmethod()
@@ -2347,6 +2407,7 @@ do
             if original and silentActive() and self == Workspace
                 and (Features.SilentMode == 1 or Features.SilentMode == 3)
                 and not (checkcaller and checkcaller()) then
+                stats.seen += 1
                 local args = redirectArgs("Raycast", {origin, direction})
                 if args then return original(self, args[1], args[2], ...) end
             end
@@ -2413,6 +2474,111 @@ do
             end
         end
     end
+
+    -- ---------- Kéo ngắm ----------
+    -- Camera.CFrame chỉ đổi hình ảnh, còn hướng bắn của game dựa trên góc ngắm nội bộ (cập nhật theo
+    -- chuyển động chuột), nên kéo camera thì cam xoay mà súng không theo. Phương thức Mouse gọi
+    -- mousemoverel để chính game xoay góc ngắm => súng và camera cùng theo.
+    local aimRemX, aimRemY = 0, 0
+    local function applyAim(pos, factor)
+        if Features.AimMethod == 1 and mousemoverel then
+            local sp = Camera:WorldToViewportPoint(pos)
+            local cx, cy = Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2
+            local dx, dy
+            if sp.Z > 0 then
+                dx, dy = sp.X - cx, sp.Y - cy
+            else
+                local rel = Camera.CFrame:PointToObjectSpace(pos)
+                dx, dy = (rel.X >= 0) and 600 or -600, 0
+            end
+            local scale = math.max(Features.MouseScale, 1) / 100
+            aimRemX += dx * factor / scale
+            aimRemY += dy * factor / scale
+            local mx = math.clamp(aimRemX >= 0 and math.floor(aimRemX) or math.ceil(aimRemX), -250, 250)
+            local my = math.clamp(aimRemY >= 0 and math.floor(aimRemY) or math.ceil(aimRemY), -250, 250)
+            aimRemX = math.clamp(aimRemX - mx, -1, 1)
+            aimRemY = math.clamp(aimRemY - my, -1, 1)
+            if mx ~= 0 or my ~= 0 then pcall(mousemoverel, mx, my) end
+        else
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, pos), factor)
+        end
+    end
+
+    -- Đo tự động: 1 đơn vị chuột = bao nhiêu pixel trên màn hình (phụ thuộc độ nhạy / FOV / độ phân giải)
+    function Custom.calibrateMouse()
+        if not mousemoverel then
+            showNotification("Calibrate", "Executor thiếu mousemoverel", 4)
+            return
+        end
+        if UserInputService.MouseBehavior ~= Enum.MouseBehavior.LockCenter then
+            showNotification("Calibrate", "Cần đang trong trận (chuột khóa giữa màn hình)", 5)
+            return
+        end
+        task.spawn(function()
+            local cam = Workspace.CurrentCamera
+            local p = cam.CFrame.Position + cam.CFrame.LookVector * 300
+            local before, onBefore = cam:WorldToViewportPoint(p)
+            pcall(mousemoverel, 40, 0)
+            task.wait(0.12)
+            local after, onAfter = cam:WorldToViewportPoint(p)
+            pcall(mousemoverel, -40, 0)
+            local ppu = (before.X - after.X) / 40
+            if onBefore and onAfter and ppu > 0.02 and ppu < 20 then
+                Features.MouseScale = math.clamp(math.floor(ppu * 100 + 0.5), 5, 500)
+                showNotification("Calibrate", string.format("Mouse Scale = %d (1 đơn vị chuột = %.2f px)", Features.MouseScale, ppu), 5)
+                if Custom.syncUI then Custom.syncUI() end
+            else
+                showNotification("Calibrate", "Không đo được, đứng yên rồi thử lại", 5)
+            end
+        end)
+    end
+
+    -- ---------- Rage Bot: tp tới địch -> bắn -> về chỗ cũ, lặp lại ----------
+    Custom.rageTPBusy = false
+    task.spawn(function()
+        while not khangUnloaded do
+            local ran = false
+            if Features.RageBot and Features.RageTP
+                and (not Features.RageNeedMouseLock or UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter)
+                and not (Custom.menuVisible and Custom.menuVisible()) then
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                local t = silentTarget
+                local tChar = t and t.character
+                local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+                local tHead = tChar and tChar:FindFirstChild("Head")
+                local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+                if root and hum and hum.Health > 0 and tRoot and tHead and tHum and tHum.Health > 0 then
+                    ran = true
+                    local home = root.CFrame
+                    Custom.rageTPBusy = true
+                    pcall(function()
+                        -- Đứng sau lưng địch, cách Features.RageTPDistance stud
+                        local pos = tRoot.Position - tRoot.CFrame.LookVector * Features.RageTPDistance
+                            + Vector3.new(0, Features.RageTPHeight, 0)
+                        root.CFrame = CFrame.new(pos, Vector3.new(tHead.Position.X, pos.Y, tHead.Position.Z))
+                        root.AssemblyLinearVelocity = Vector3.zero
+                        task.wait(0.04)
+                        for _ = 1, Features.RageTPShots do
+                            if khangUnloaded or not tHead.Parent or tHum.Health <= 0 then break end
+                            Camera.CFrame = CFrame.new(Camera.CFrame.Position, tHead.Position)
+                            doClick()
+                            task.wait(0.03)
+                        end
+                        task.wait(0.02)
+                    end)
+                    -- Luôn quay về chỗ cũ, kể cả khi có lỗi giữa chừng
+                    pcall(function()
+                        root.CFrame = home
+                        root.AssemblyLinearVelocity = Vector3.zero
+                    end)
+                    Custom.rageTPBusy = false
+                end
+            end
+            task.wait(ran and math.max(Features.RageTPDelay, 30) / 1000 or 0.05)
+        end
+    end)
 
     -- ---------- Aim Assist / Trigger / Auto Clicker ----------
     local aimLockPlayer, aimLockKind = nil, 1
@@ -2503,10 +2669,9 @@ do
                     target.position = target.part.Position + Vector3.new(0, Features.AimOffset, 0)
                     aimLockPlayer = target.player
                     aimTarget = target
-                    local goal = CFrame.new(Camera.CFrame.Position, target.position)
                     local base = math.clamp(1 - (Features.AimbotSmooth / 101), 0.01, 1)
                     local factor = base + (1 - base) * (Features.AimbotSticky / 100) * 0.5
-                    Camera.CFrame = Camera.CFrame:Lerp(goal, factor)
+                    applyAim(target.position, factor)
                 else
                     aimCache, aimLockPlayer = nil, nil
                 end
@@ -2539,12 +2704,7 @@ do
                 if Features.LockPredict > 0 then
                     pos += t.part.AssemblyLinearVelocity * (Features.LockPredict / 1000)
                 end
-                local goal = CFrame.new(Camera.CFrame.Position, pos)
-                if Features.LockSmooth <= 0 then
-                    Camera.CFrame = goal
-                else
-                    Camera.CFrame = Camera.CFrame:Lerp(goal, math.clamp(1 - Features.LockSmooth / 101, 0.02, 1))
-                end
+                applyAim(pos, Features.LockSmooth <= 0 and 1 or math.clamp(1 - Features.LockSmooth / 101, 0.02, 1))
                 t.position = pos
                 aimTarget = t
             end
@@ -2553,6 +2713,21 @@ do
         end
 
         -- Silent Aim
+        -- Đang bắn mà hook hàm không thấy tia nào => executor không bắt được đạn qua hook hàm, tự chuyển sang Namecall
+        if Features.SilentAim and raycastHooked and not namecallInstalled and Features.SilentHook == 1
+            and silentTarget and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            fireWatch += dt
+            if fireWatch > 1.2 and stats.seen == 0 then
+                namecallInstalled = true
+                task.spawn(function()
+                    local ok = pcall(installRaycastHook)
+                    showNotification("Silent Aim", ok and "Hook hàm không bắt được đạn, đã chuyển sang Namecall" or "Không cài được hook Namecall", 5)
+                end)
+            end
+        else
+            fireWatch = 0
+        end
+
         -- Cài hook ở luồng riêng, chỉ khi bật lần đầu / đổi mode (trước đây chạy ngay trong frame render nên bị đơ)
         if (Features.SilentAim or Features.RageBot) and hooksMode ~= Features.SilentMode then
             hooksMode = Features.SilentMode
@@ -2575,10 +2750,10 @@ do
         -- Rage Bot: tự bắn + (tuỳ chọn) kéo camera thẳng vào mục tiêu
         local rageLocked = not Features.RageNeedMouseLock or UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter
         if Features.RageBot and silentTarget and rageLocked then
-            if Features.RageSnap then
+            if Features.RageSnap and not Features.RageTP then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, silentTarget.position)
             end
-            if Features.RageAutoFire then
+            if Features.RageAutoFire and not Features.RageTP then
                 rageTimer += dt
                 local rageInterval = 1 / math.max(Features.RageCPS, 1)
                 if rageTimer >= rageInterval then
@@ -4495,7 +4670,7 @@ do
         end
 
         -- Anti Aim: xoay / giật hướng nhân vật
-        if (Features.AntiAim or (Features.RageBot and Features.RageAntiAim)) and alive then
+        if (Features.AntiAim or (Features.RageBot and Features.RageAntiAim)) and alive and not Custom.rageTPBusy then
             if not aaActive then
                 aaActive = true
                 aaSavedAutoRotate = hum.AutoRotate
@@ -6633,6 +6808,9 @@ end)()
             }},
             {name = "Aim Assist", key = "Aimbot", settings = {
                 {type = "cycle", name = "Part", key = "AimPart", options = Custom.AIM_PARTS},
+                {type = "cycle", name = "Method", key = "AimMethod", options = Custom.AIM_METHODS},
+                {type = "slider", name = "Mouse Scale", key = "MouseScale", min = 5, max = 500},
+                {type = "button", name = "Calibrate Mouse (trong trận)", action = function() Custom.calibrateMouse() end},
                 {type = "slider", name = "FOV", key = "AimbotFOV", min = 30, max = 500},
                 {type = "slider", name = "Smoothness", key = "AimbotSmooth", min = 1, max = 100},
                 {type = "slider", name = "Stickiness", key = "AimbotSticky", min = 0, max = 100},
@@ -6652,11 +6830,14 @@ end)()
                 {type = "slider", name = "Aim Offset", key = "AimOffset", min = -10, max = 10},
                 {type = "toggle", name = "Wall Check", key = "SilentWallCheck"},
                 {type = "toggle", name = "AutoFire", key = "SilentAutoFire"},
+                {type = "toggle", name = "Giữ mục tiêu khi bắn (Sticky)", key = "SilentSticky"},
                 {type = "cycle", name = "Hook", key = "SilentHook", options = Custom.HOOK_MODES},
                 {type = "toggle", name = "Debug Log (F9)", key = "SilentDebug"},
             }},
             {name = "Aim Lock", key = "AimLock", settings = {
                 {type = "cycle", name = "Part", key = "LockPart", options = Custom.AIM_PARTS},
+                {type = "cycle", name = "Method", key = "AimMethod", options = Custom.AIM_METHODS},
+                {type = "button", name = "Calibrate Mouse (trong trận)", action = function() Custom.calibrateMouse() end},
                 {type = "slider", name = "FOV", key = "LockFOV", min = 30, max = 800},
                 {type = "slider", name = "Range", key = "LockRange", min = 50, max = 3000},
                 {type = "slider", name = "Smoothness (0 = cứng)", key = "LockSmooth", min = 0, max = 100},
@@ -6674,6 +6855,11 @@ end)()
                 {type = "toggle", name = "Snap Camera", key = "RageSnap"},
                 {type = "toggle", name = "Anti Aim", key = "RageAntiAim"},
                 {type = "toggle", name = "Chỉ chạy khi chuột khóa (trong trận)", key = "RageNeedMouseLock"},
+                {type = "toggle", name = "Teleport Shoot (tp bắn rồi về)", key = "RageTP"},
+                {type = "slider", name = "TP Distance", key = "RageTPDistance", min = 2, max = 30},
+                {type = "slider", name = "TP Height", key = "RageTPHeight", min = 0, max = 15},
+                {type = "slider", name = "Shots / lượt", key = "RageTPShots", min = 1, max = 10},
+                {type = "slider", name = "Delay giữa các lượt (ms)", key = "RageTPDelay", min = 30, max = 1000},
             }},
             {name = "Target Info (HP)", key = "ShowTargetInfo"},
             {name = "Target Filter", settings = {
